@@ -15,6 +15,7 @@
 
 /* The DSP window indices are fixed */
 #define SOF_IPC4_OUTBOX_WINDOW_IDX	1
+#define SOF_IPC4_DEBUG_WINDOW_IDX	2
 
 /* 5 chars for the .bin extension and the null terminator */
 #define LIBRARY_FILENAME_LEN (UUID_STRING_LEN + 5)
