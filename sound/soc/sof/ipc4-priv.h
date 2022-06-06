@@ -13,6 +13,9 @@
 #include <sound/sof/ext_manifest4.h>
 #include "sof-priv.h"
 
+/* The DSP window indices are fixed */
+#define SOF_IPC4_OUTBOX_WINDOW_IDX	1
+
 /* 5 chars for the .bin extension and the null terminator */
 #define LIBRARY_FILENAME_LEN (UUID_STRING_LEN + 5)
 
