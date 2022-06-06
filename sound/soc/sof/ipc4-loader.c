@@ -20,10 +20,11 @@ static size_t sof_ipc4_lib_parse_ext_man(struct snd_sof_dev *sdev, const struct 
 	struct sof_man4_fw_binary_header *fw_header;
 	struct sof_ext_manifest4_hdr *ext_man_hdr;
 	struct sof_man4_module_config *fm_config;
+	struct sof_ipc4_fw_module *fw_module;
 	struct sof_man4_module *fm_entry;
 	ssize_t remaining;
 	u32 fw_hdr_offset;
-	int i;
+	int i, old_num_fw_modules, new_num_fw_modules;
 
 	remaining = fw->size;
 	if (remaining <= sizeof(*ext_man_hdr)) {
@@ -33,9 +34,18 @@ static size_t sof_ipc4_lib_parse_ext_man(struct snd_sof_dev *sdev, const struct 
 
 	ext_man_hdr = (struct sof_ext_manifest4_hdr *)fw->data;
 
+	dev_info(sdev->dev, "Lib info: id: %d, len: %d, version_major: %d,"
+				"version_minor: %d, num_module_entries: %d\n", ext_man_hdr->id,
+				ext_man_hdr->len, ext_man_hdr->version_major, ext_man_hdr->version_minor,
+				ext_man_hdr->num_module_entries);
+
+	dev_info(sdev->dev, "ext_man_hdr size: %d", sizeof(*ext_man_hdr));
+
 	fw_hdr_offset = ipc4_data->manifest_fw_hdr_offset;
 	if (!fw_hdr_offset)
 		return -EINVAL;
+
+	dev_info(sdev->dev, "FW header offset: %d\n", fw_hdr_offset);
 
 	if (remaining <= ext_man_hdr->len + fw_hdr_offset + sizeof(*fw_header)) {
 		dev_err(sdev->dev, "Invalid firmware size %zu, should be at least %zu\n",
@@ -47,6 +57,18 @@ static size_t sof_ipc4_lib_parse_ext_man(struct snd_sof_dev *sdev, const struct 
 				(fw->data + ext_man_hdr->len + fw_hdr_offset);
 	remaining -= (ext_man_hdr->len + fw_hdr_offset);
 
+	dev_info(sdev->dev, "FW Headerp1: id: %d, len: %d, name: %s, preload_page_count: %d, "
+		"fw_image_flags: %d\n", fw_header->id, fw_header->len, fw_header->name,
+		fw_header->preload_page_count, fw_header->fw_image_flags);
+
+	dev_info(sdev->dev, "FW Headerp2: feature_mask: %d, major_version: %d, minor_version: %d, "
+		"hotfix_version: %d, build_version: %d\n", fw_header->feature_mask, fw_header->major_version,
+		fw_header->minor_version, fw_header->hotfix_version, fw_header->build_version);
+
+	dev_info(sdev->dev, "FW Headerp3: num_module_entries: %d, hw_buf_base_addr: %d, "
+		"hw_buf_length: %d, load_offset: %d\n", fw_header->num_module_entries,
+		fw_header->hw_buf_base_addr, fw_header->hw_buf_length, fw_header->load_offset);
+
 	if (remaining <= fw_header->len) {
 		dev_err(sdev->dev, "Invalid fw_header->len %u\n", fw_header->len);
 		return -EINVAL;
@@ -57,6 +79,27 @@ static size_t sof_ipc4_lib_parse_ext_man(struct snd_sof_dev *sdev, const struct 
 		 fw_header->hotfix_version, fw_header->build_version);
 	dev_dbg(sdev->dev, "Firmware name: %s, header length: %u, module count: %u\n",
 		fw_header->name, fw_header->len, fw_header->num_module_entries);
+
+	new_num_fw_modules = ipc4_data->num_fw_modules + fw_header->num_module_entries;
+	ipc4_data->fw_modules = devm_krealloc(sdev->dev,
+								ipc4_data->fw_modules,
+								new_num_fw_modules * sizeof(*fw_module),
+								GFP_KERNEL);
+	if (!ipc4_data->fw_modules)
+		return -ENOMEM;
+
+	ipc4_data->base_fw_module_uuids = devm_krealloc(sdev->dev,
+									ipc4_data->base_fw_module_uuids,
+									new_num_fw_modules * sizeof(guid_t),
+									GFP_KERNEL);
+	if (!ipc4_data->base_fw_module_uuids)
+		return -ENOMEM;
+
+	old_num_fw_modules = ipc4_data->num_fw_modules;
+	ipc4_data->num_fw_modules = new_num_fw_modules;
+	fw_module = ipc4_data->fw_modules;
+	/* jump over the existing basefw modules */
+	fw_module += old_num_fw_modules;
 
 	fm_entry = (struct sof_man4_module *)((u8 *)fw_header + fw_header->len);
 	remaining -= fw_header->len;
@@ -72,6 +115,8 @@ static size_t sof_ipc4_lib_parse_ext_man(struct snd_sof_dev *sdev, const struct 
 	remaining -= (fw_header->num_module_entries * sizeof(*fm_entry));
 
 	for (i = 0; i < fw_header->num_module_entries; i++) {
+		memcpy(&fw_module->man4_module_entry, fm_entry, sizeof(*fm_entry));
+
 		if (fm_entry->cfg_count) {
 			if (remaining < (fm_entry->cfg_offset + fm_entry->cfg_count) *
 			    sizeof(*fm_config)) {
@@ -80,10 +125,22 @@ static size_t sof_ipc4_lib_parse_ext_man(struct snd_sof_dev *sdev, const struct 
 				return -EINVAL;
 			}
 
+			fw_module->bss_size = fm_config[fm_entry->cfg_offset].is_bytes;
+			guid_copy(&ipc4_data->base_fw_module_uuids[i], &fm_entry->uuid);
+
 			dev_dbg(sdev->dev,
 				"module %s: UUID %pUL cfg_count: %u\n",
 				fm_entry->name, &fm_entry->uuid, fm_entry->cfg_count);
+		} else {
+			fw_module->bss_size = 0;
+			dev_dbg(sdev->dev, "module %s: UUID %pUL\n", fm_entry->name,
+				&fm_entry->uuid);
 		}
+
+		fw_module->man4_module_entry.id = i;
+		ida_init(&fw_module->m_ida);
+		fw_module->private = NULL;
+		fw_module++;
 		fm_entry++;
 	}
 
@@ -329,7 +386,7 @@ static int sof_ipc4_load_library(struct snd_sof_dev *sdev, guid_t *widget_uuid)
 			ipc4_data->max_fw_libs);
 		return -EBUSY;
 	}
-
+	dev_info(sdev->dev, "Request module firmware %s\n", fw_filename);
 	ret = request_firmware(&fw, fw_filename, sdev->dev);
 	if (ret < 0) {
 		dev_err(sdev->dev, "Library file '%s' is missing\n", fw_filename);
@@ -339,6 +396,8 @@ static int sof_ipc4_load_library(struct snd_sof_dev *sdev, guid_t *widget_uuid)
 	fw_offset = sof_ipc4_lib_parse_ext_man(sdev, fw);
 	if (fw_offset < 0)
 		return ret;
+
+	dev_info(sdev->dev, "Firmware Offset: %d\n", fw_offset);
 
 	dev_dbg(sdev->dev, "loaded library %s\n", fw_filename);
 

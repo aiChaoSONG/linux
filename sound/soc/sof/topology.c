@@ -1884,6 +1884,7 @@ static int sof_complete(struct snd_soc_component *scomp)
 	const struct sof_ipc_tplg_ops *ipc_tplg_ops = sdev->ipc->ops->tplg;
 	const struct sof_ipc_tplg_widget_ops *widget_ops = ipc_tplg_ops->widget;
 	struct snd_sof_control *scontrol;
+	char fw_filename[45];
 	int ret;
 
 	/* first update all control IPC structures based on the IPC version */
@@ -1900,6 +1901,9 @@ static int sof_complete(struct snd_soc_component *scomp)
 	/* load all 3rd party module libraries */
 	list_for_each_entry(swidget, &sdev->widget_list, list) {
 		/* nothing to do if UUID is not set */
+		dev_info(sdev->dev, "Widget comp id: %d\n", swidget->comp_id);
+		snprintf(fw_filename, 45, "%pUL.bin", &swidget->uuid);
+		dev_info(sdev->dev, "Request module firmware %s\n", fw_filename);
 		if (guid_is_null(&swidget->uuid))
 			continue;
 
