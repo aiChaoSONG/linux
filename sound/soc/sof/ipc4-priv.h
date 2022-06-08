@@ -23,6 +23,7 @@
  * @fw_modules: Array of base FW modules
  * @max_fw_libs: Maximum number of module libraries supported by the FW
  * @fw_lib_names: Array of module library names. This does not include the base FW
+ * @base_fw_module_uuids: List of UUIDs belonging to modules in the base FW
  * @nhlt: NHLT table either from the BIOS or the topology manifest
  */
 struct sof_ipc4_fw_data {
@@ -31,6 +32,7 @@ struct sof_ipc4_fw_data {
 	void *fw_modules;
 	u32 max_fw_libs;
 	char (*fw_lib_names)[LIBRARY_FILENAME_LEN];
+	guid_t *base_fw_module_uuids;
 	void *nhlt;
 };
 
