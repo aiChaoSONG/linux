@@ -416,7 +416,7 @@ struct sof_ipc_fw_loader_ops {
 	size_t (*parse_ext_manifest)(struct snd_sof_dev *sdev);
 	int (*load_fw_to_dsp)(struct snd_sof_dev *sdev);
 	int (*query_fw_configuration)(struct snd_sof_dev *sdev);
-	int (*load_library)(struct snd_sof_dev *sdev, guid_t *uuid);
+	int (*load_library)(struct snd_sof_dev *sdev, const guid_t *uuid);
 	int (*get_modules_info)(struct snd_sof_dev *sdev);
 };
 
