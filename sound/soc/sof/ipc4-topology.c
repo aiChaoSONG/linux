@@ -1442,8 +1442,6 @@ static int sof_ipc4_route_setup(struct snd_sof_dev *sdev, struct snd_sof_route *
 	struct sof_ipc4_fw_module *sink_fw_module = sink_widget->module_info;
 	struct sof_ipc4_msg msg = {{ 0 }};
 	u32 header, extension;
-	int src_queue = 0;
-	int dst_queue = 0;
 	int ret;
 
 	dev_dbg(sdev->dev, "bind %s -> %s\n",
@@ -1457,8 +1455,8 @@ static int sof_ipc4_route_setup(struct snd_sof_dev *sdev, struct snd_sof_route *
 
 	extension = sink_fw_module->man4_module_entry.id;
 	extension |= SOF_IPC4_MOD_EXT_DST_MOD_INSTANCE(sink_widget->instance_id);
-	extension |= SOF_IPC4_MOD_EXT_DST_MOD_QUEUE_ID(dst_queue);
-	extension |= SOF_IPC4_MOD_EXT_SRC_MOD_QUEUE_ID(src_queue);
+	extension |= SOF_IPC4_MOD_EXT_DST_MOD_QUEUE_ID(sroute->sink_queue);
+	extension |= SOF_IPC4_MOD_EXT_SRC_MOD_QUEUE_ID(sroute->src_queue);
 
 	msg.primary = header;
 	msg.extension = extension;
@@ -1479,8 +1477,6 @@ static int sof_ipc4_route_free(struct snd_sof_dev *sdev, struct snd_sof_route *s
 	struct sof_ipc4_fw_module *sink_fw_module = sink_widget->module_info;
 	struct sof_ipc4_msg msg = {{ 0 }};
 	u32 header, extension;
-	int src_queue = 0;
-	int dst_queue = 0;
 	int ret;
 
 	dev_dbg(sdev->dev, "unbind modules %s -> %s\n",
@@ -1494,8 +1490,8 @@ static int sof_ipc4_route_free(struct snd_sof_dev *sdev, struct snd_sof_route *s
 
 	extension = sink_fw_module->man4_module_entry.id;
 	extension |= SOF_IPC4_MOD_EXT_DST_MOD_INSTANCE(sink_widget->instance_id);
-	extension |= SOF_IPC4_MOD_EXT_DST_MOD_QUEUE_ID(dst_queue);
-	extension |= SOF_IPC4_MOD_EXT_SRC_MOD_QUEUE_ID(src_queue);
+	extension |= SOF_IPC4_MOD_EXT_DST_MOD_QUEUE_ID(sroute->sink_queue);
+	extension |= SOF_IPC4_MOD_EXT_SRC_MOD_QUEUE_ID(sroute->src_queue);
 
 	msg.primary = header;
 	msg.extension = extension;

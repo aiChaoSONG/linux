@@ -1821,6 +1821,23 @@ static int sof_link_unload(struct snd_soc_component *scomp, struct snd_soc_dobj 
 	return 0;
 }
 
+static int parse_route_endpoint(const char *route_ep, char *widget_name,
+								 int *widget_queue)
+{
+	char *separator;
+
+	separator = strchr(route_ep, ':');
+	if (separator) {
+		memset(widget_name, 0, SNDRV_CTL_ELEM_ID_NAME_MAXLEN);
+		strncpy(widget_name, route_ep, (separator - route_ep));
+		return kstrtoint((separator + 1), 0, widget_queue);
+	} else {
+		strcpy(widget_name, route_ep);
+		*widget_queue = 0;
+	}
+
+	return 0;
+}
 /* DAI link - used for any driver specific init */
 static int sof_route_load(struct snd_soc_component *scomp, int index,
 			  struct snd_soc_dapm_route *route)
@@ -1829,6 +1846,7 @@ static int sof_route_load(struct snd_soc_component *scomp, int index,
 	struct snd_sof_widget *source_swidget, *sink_swidget;
 	struct snd_soc_dobj *dobj = &route->dobj;
 	struct snd_sof_route *sroute;
+	char widget_name[SNDRV_CTL_ELEM_ID_NAME_MAXLEN];
 	int ret = 0;
 
 	/* allocate memory for sroute and connect */
@@ -1841,8 +1859,18 @@ static int sof_route_load(struct snd_soc_component *scomp, int index,
 		route->sink, route->control ? route->control : "none",
 		route->source);
 
+	ret = parse_route_endpoint(route->source, widget_name, &sroute->src_queue);
+	if (ret) {
+		dev_err(scomp->dev, "error: unable to parse endpoint for %s\n",
+			route->source);
+		goto err;
+	}
+
+	dev_info(sdev->dev, "Origin: %s, Parsed: %s, Queue: %d\n", route->source,
+				 widget_name, sroute->src_queue);
+
 	/* source component */
-	source_swidget = snd_sof_find_swidget(scomp, (char *)route->source);
+	source_swidget = snd_sof_find_swidget(scomp, widget_name);
 	if (!source_swidget) {
 		dev_err(scomp->dev, "error: source %s not found\n",
 			route->source);
@@ -1860,8 +1888,16 @@ static int sof_route_load(struct snd_soc_component *scomp, int index,
 	    source_swidget->id == snd_soc_dapm_output)
 		goto err;
 
+	ret = parse_route_endpoint(route->sink, widget_name, &sroute->sink_queue);
+	if (ret) {
+		dev_err(scomp->dev, "error: unable to parse endpoint for %s\n",
+			route->source);
+		goto err;
+	}
+	dev_info(sdev->dev, "Origin: %s, Parsed: %s, Queue: %d\n", route->sink,
+					 widget_name, sroute->sink_queue);
 	/* sink component */
-	sink_swidget = snd_sof_find_swidget(scomp, (char *)route->sink);
+	sink_swidget = snd_sof_find_swidget(scomp, widget_name);
 	if (!sink_swidget) {
 		dev_err(scomp->dev, "error: sink %s not found\n",
 			route->sink);
