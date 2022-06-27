@@ -258,5 +258,35 @@ struct sof_ipc4_process {
 	struct sof_ipc4_msg msg;
 };
 
+struct sof_ipc4_input_pin_format
+{
+	uint32_t pin_index;
+	uint32_t ibs;
+	struct sof_ipc4_audio_format audio_fmt;
+};
+
+struct sof_ipc4_output_pin_format
+{
+	uint32_t pin_index;
+	uint32_t obs;
+	struct sof_ipc4_audio_format audio_fmt;
+};
+
+struct sof_ipc4_base_module_cfg_ext
+{
+	uint16_t in_pin_count;
+	uint16_t out_pin_count;
+	uint8_t reserved[12];
+	struct sof_ipc4_input_pin_format input_pins[0];
+	struct sof_ipc4_output_pin_format output_pins[0];
+};
+
+struct sof_ipc4_smart_amp_init_config
+{
+	struct sof_ipc4_base_module_cfg base_config;
+	struct sof_ipc4_base_module_cfg_ext base_config_ext;
+};
+
+
 
 #endif

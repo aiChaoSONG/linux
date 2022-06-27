@@ -335,6 +335,7 @@ static int sof_ipc4_widget_set_module_info(struct snd_sof_widget *swidget)
 static int sof_ipc4_widget_setup_msg(struct snd_sof_widget *swidget, struct sof_ipc4_msg *msg)
 {
 	struct sof_ipc4_fw_module *fw_module;
+	uint32_t type;
 	int ret;
 
 	ret = sof_ipc4_widget_set_module_info(swidget);
@@ -350,6 +351,8 @@ static int sof_ipc4_widget_setup_msg(struct snd_sof_widget *swidget, struct sof_
 
 	msg->extension = SOF_IPC4_MOD_EXT_PPL_ID(swidget->pipeline_id);
 	msg->extension |= SOF_IPC4_MOD_EXT_CORE_ID(swidget->core);
+	type = fw_module->man4_module_entry.type;
+	msg->extension |= SOF_IPC4_MOD_EXT_DOMAIN(SOF_IPC4_MODULE_DOMAIN_DP(type));
 
 	return 0;
 }
@@ -1076,6 +1079,7 @@ sof_ipc4_prepare_copier_module(struct snd_sof_widget *swidget,
 	int *ipc_config_size;
 	u32 **data;
 	int ipc_size, ret;
+	struct sof_ipc4_base_module_cfg *tmp_base;
 
 	dev_dbg(sdev->dev, "copier %s, type %d", swidget->widget->name, swidget->id);
 
@@ -1255,6 +1259,16 @@ sof_ipc4_prepare_copier_module(struct snd_sof_widget *swidget,
 	ipc_config_size = &ipc4_copier->ipc_config_size;
 	ipc_config_data = &ipc4_copier->ipc_config_data;
 
+	tmp_base = &copier_data->base_config;
+
+	dev_info(sdev->dev, "Copier BaseCFG: cpc=%u, ibs=%u, obs=%u, is_pages=%u\n",
+			tmp_base->cpc,tmp_base->ibs, tmp_base->obs, tmp_base->is_pages);
+
+	dev_info(sdev->dev, "Copier BaseCFG Format: sr=%u, bits=%u, ch_map=%x, ch_cfg=%u, interleave=%u, fmt_cfg=%u\n",
+			tmp_base->audio_fmt.sampling_frequency, tmp_base->audio_fmt.bit_depth,
+			tmp_base->audio_fmt.ch_map, tmp_base->audio_fmt.ch_cfg,
+			 tmp_base->audio_fmt.interleaving_style, tmp_base->audio_fmt.fmt_cfg);
+
 	/* config_length is DWORD based */
 	ipc_size = sizeof(*copier_data) + copier_data->gtw_cfg.config_length * 4;
 
@@ -1348,6 +1362,13 @@ static int sof_ipc4_prepare_process_module(struct snd_sof_widget *swidget,
 	struct snd_sof_dev *sdev = snd_soc_component_get_drvdata(scomp);
 	struct sof_ipc4_process *process = swidget->private;
 	int ret;
+	size_t compond_cfg_size;
+	struct sof_ipc4_smart_amp_init_config *compond_cfg;
+	struct sof_ipc4_base_module_cfg *tmp_base;
+	struct sof_ipc4_base_module_cfg_ext *tmp_ext;
+
+	struct sof_ipc4_input_pin_format *in_fmt;
+	struct sof_ipc4_output_pin_format *out_fmt;
 
 	process->available_fmt.ref_audio_fmt = &process->available_fmt.base_config->audio_fmt;
 
@@ -1368,6 +1389,58 @@ static int sof_ipc4_prepare_process_module(struct snd_sof_widget *swidget,
 	case SOF_PROCESS_SMART_AMP:
 		process->ipc_config_data = &process->base_config;
 		process->ipc_config_size = sizeof(struct sof_ipc4_base_module_cfg);
+
+
+		compond_cfg_size = sizeof(struct sof_ipc4_base_module_cfg) + \
+							sizeof(struct sof_ipc4_base_module_cfg_ext) + \
+							3 * sizeof(struct sof_ipc4_input_pin_format);
+
+		dev_info(sdev->dev, "smart amp config size:%ld\n", compond_cfg_size);
+
+		compond_cfg = kzalloc(compond_cfg_size, GFP_KERNEL);
+		if (!process)
+			return -ENOMEM;
+
+		tmp_base = &compond_cfg->base_config;
+		tmp_ext = &compond_cfg->base_config_ext;
+
+		/* Copy base module config */
+		memcpy(tmp_base, &process->base_config, sizeof(struct sof_ipc4_base_module_cfg));
+
+		dev_info(sdev->dev, "BaseCFG: cpc=%u, ibs=%u, obs=%u, is_pages=%u\n",
+			tmp_base->cpc,tmp_base->ibs, tmp_base->obs, tmp_base->is_pages);
+
+		dev_info(sdev->dev, "BaseCFG Format: sr=%u, bits=%u, ch_map=%x, ch_cfg=%u, interleave=%u, fmt_cfg=%u\n",
+			tmp_base->audio_fmt.sampling_frequency, tmp_base->audio_fmt.bit_depth,
+			tmp_base->audio_fmt.ch_map, tmp_base->audio_fmt.ch_cfg,
+			 tmp_base->audio_fmt.interleaving_style, tmp_base->audio_fmt.fmt_cfg);
+
+
+		/* cfg_ext_size: 16, pin format: 32 */
+		dev_info(sdev->dev, "cfg_ext_size: %lu\n", sizeof(struct sof_ipc4_base_module_cfg_ext));
+		dev_info(sdev->dev, "pin format: %lu\n", sizeof(struct sof_ipc4_input_pin_format));
+
+		tmp_ext = &compond_cfg->base_config_ext;
+		tmp_ext->in_pin_count = 2;
+		tmp_ext->out_pin_count = 1;
+
+		in_fmt = (struct sof_ipc4_input_pin_format*) ((char*)tmp_ext + 16);
+		in_fmt->pin_index = 0;
+		in_fmt->ibs = 384;
+		memcpy(&in_fmt->audio_fmt, &tmp_base->audio_fmt, sizeof(struct sof_ipc4_audio_format));
+
+		in_fmt += 1;
+		in_fmt->pin_index = 1;
+		in_fmt->ibs = 384;
+		memcpy(&in_fmt->audio_fmt, &tmp_base->audio_fmt, sizeof(struct sof_ipc4_audio_format));
+
+		out_fmt = (struct sof_ipc4_output_pin_format*)(in_fmt + 1);
+		out_fmt->pin_index = 0;
+		out_fmt->obs = 384;
+		memcpy(&out_fmt->audio_fmt, &tmp_base->audio_fmt, sizeof(struct sof_ipc4_audio_format));
+
+		process->ipc_config_size = compond_cfg_size;
+		process->ipc_config_data = compond_cfg;
 		break;
 	default:
 		dev_err(scomp->dev, "process type %d not supported\n", process->process_type);
@@ -1512,8 +1585,6 @@ static int sof_ipc4_widget_setup(struct snd_sof_dev *sdev, struct snd_sof_widget
 
 		msg->extension &= ~SOF_IPC4_MOD_EXT_PARAM_SIZE_MASK;
 		msg->extension |= ipc_size >> 2;
-		msg->extension &= ~SOF_IPC4_MOD_EXT_DOMAIN_MASK;
-		msg->extension |= SOF_IPC4_MOD_EXT_DOMAIN(pipeline->lp_mode);
 	}
 
 	msg->data_size = ipc_size;
@@ -1567,6 +1638,7 @@ static int sof_ipc4_route_setup(struct snd_sof_dev *sdev, struct snd_sof_route *
 
 	dev_dbg(sdev->dev, "bind %s -> %s\n",
 		src_widget->widget->name, sink_widget->widget->name);
+	dev_info(sdev->dev, "src queue: %u, dst queue: %u\n", sroute->src_queue,sroute->sink_queue);
 
 	header = src_fw_module->man4_module_entry.id;
 	header |= SOF_IPC4_MOD_INSTANCE(src_widget->instance_id);
@@ -1586,6 +1658,21 @@ static int sof_ipc4_route_setup(struct snd_sof_dev *sdev, struct snd_sof_route *
 	if (ret < 0)
 		dev_err(sdev->dev, "%s: failed to bind modules %s -> %s\n",
 			__func__, src_widget->widget->name, sink_widget->widget->name);
+
+	if(sroute->src_queue == 1) {
+		dev_info(sdev->dev, "Primary MSG: %u\n", header);
+		u32 large_data[0x34] = {0x00000001, 0x0000bb80, 0x00000020, 0xFFFFFF10, 0x00000001, 0x00000000, 0x00001802, 0x0000bb80, 0x00000020, 0xFFFFFF10, 0x00000001, 0x00000000, 0x00001802};
+
+		msg.primary = 0x44010004;
+
+		msg.extension = 0x20200034;
+
+		msg.data_ptr = large_data;
+
+		msg.data_size = 0x34;
+
+        sdev->ipc->ops->set_get_data(sdev, &msg, 0x34, true);
+	}
 
 	return ret;
 }

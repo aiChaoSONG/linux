@@ -175,6 +175,8 @@ int sof_route_setup(struct snd_sof_dev *sdev, struct snd_soc_dapm_widget *wsourc
 	bool route_found = false;
 	int ret;
 
+	dev_info(sdev->dev,"Connect %s to %s\n", src_widget->widget->name, sink_widget->widget->name);
+
 	/* ignore routes involving virtual widgets in topology */
 	switch (src_widget->id) {
 	case snd_soc_dapm_out_drv:
