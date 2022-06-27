@@ -2930,20 +2930,6 @@ err:
 	return ret;
 }
 
-static void snd_soc_route_get_widget_name(const char *route_endpoint,
-							char *widget_name)
-{
-	char *separator;
-
-	separator = strchr(route_endpoint, ':');
-	if (separator) {
-		memset(widget_name, 0, SNDRV_CTL_ELEM_ID_NAME_MAXLEN);
-		strncpy(widget_name, route_endpoint, (separator - route_endpoint));
-	} else {
-		strcpy(widget_name, route_endpoint);
-	}
-}
-
 static int snd_soc_dapm_add_route(struct snd_soc_dapm_context *dapm,
 				  const struct snd_soc_dapm_route *route)
 {
@@ -2953,27 +2939,22 @@ static int snd_soc_dapm_add_route(struct snd_soc_dapm_context *dapm,
 	const char *source;
 	char prefixed_sink[80];
 	char prefixed_source[80];
-	char src_widget_name[SNDRV_CTL_ELEM_ID_NAME_MAXLEN];
-	char sink_widget_name[SNDRV_CTL_ELEM_ID_NAME_MAXLEN];
 	const char *prefix;
 	unsigned int sink_ref = 0;
 	unsigned int source_ref = 0;
 	int ret;
 
-	snd_soc_route_get_widget_name(route->source, src_widget_name);
-	snd_soc_route_get_widget_name(route->sink, sink_widget_name);
-
 	prefix = soc_dapm_prefix(dapm);
 	if (prefix) {
 		snprintf(prefixed_sink, sizeof(prefixed_sink), "%s %s",
-			 prefix, sink_widget_name);
+			 prefix, route->sink);
 		sink = prefixed_sink;
 		snprintf(prefixed_source, sizeof(prefixed_source), "%s %s",
-			 prefix, src_widget_name);
+			 prefix, route->source);
 		source = prefixed_source;
 	} else {
-		sink = sink_widget_name;
-		source = src_widget_name;
+		sink = route->sink;
+		source = route->source;
 	}
 
 	wsource = dapm_wcache_lookup(&dapm->path_source_cache, source);
@@ -3056,8 +3037,6 @@ static int snd_soc_dapm_del_route(struct snd_soc_dapm_context *dapm,
 	const char *source;
 	char prefixed_sink[80];
 	char prefixed_source[80];
-	char src_widget_name[SNDRV_CTL_ELEM_ID_NAME_MAXLEN];
-	char sink_widget_name[SNDRV_CTL_ELEM_ID_NAME_MAXLEN];
 	const char *prefix;
 
 	if (route->control) {
@@ -3066,20 +3045,17 @@ static int snd_soc_dapm_del_route(struct snd_soc_dapm_context *dapm,
 		return -EINVAL;
 	}
 
-	snd_soc_route_get_widget_name(route->source, src_widget_name);
-	snd_soc_route_get_widget_name(route->sink, sink_widget_name);
-
 	prefix = soc_dapm_prefix(dapm);
 	if (prefix) {
 		snprintf(prefixed_sink, sizeof(prefixed_sink), "%s %s",
-			 prefix, sink_widget_name);
+			 prefix, route->sink);
 		sink = prefixed_sink;
 		snprintf(prefixed_source, sizeof(prefixed_source), "%s %s",
-			 prefix, src_widget_name);
+			 prefix, route->source);
 		source = prefixed_source;
 	} else {
-		sink = sink_widget_name;
-		source = src_widget_name;
+		sink = route->sink;
+		source = route->source;
 	}
 
 	path = NULL;
@@ -3177,16 +3153,14 @@ EXPORT_SYMBOL_GPL(snd_soc_dapm_del_routes);
 static int snd_soc_dapm_weak_route(struct snd_soc_dapm_context *dapm,
 				   const struct snd_soc_dapm_route *route)
 {
-	struct snd_soc_dapm_widget *source;
-	struct snd_soc_dapm_widget *sink;
-	char widget_name[SNDRV_CTL_ELEM_ID_NAME_MAXLEN];
+	struct snd_soc_dapm_widget *source = dapm_find_widget(dapm,
+							      route->source,
+							      true);
+	struct snd_soc_dapm_widget *sink = dapm_find_widget(dapm,
+							    route->sink,
+							    true);
 	struct snd_soc_dapm_path *path;
 	int count = 0;
-
-	snd_soc_route_get_widget_name(route->source, widget_name);
-	source = dapm_find_widget(dapm, widget_name, true);
-	snd_soc_route_get_widget_name(route->sink, widget_name);
-	sink = dapm_find_widget(dapm, widget_name, true);
 
 	if (!source) {
 		dev_err(dapm->dev, "ASoC: Unable to find source %s for weak route\n",

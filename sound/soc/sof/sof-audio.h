@@ -398,8 +398,6 @@ struct snd_sof_route {
 	struct list_head list;	/* list in sdev route list */
 	struct snd_sof_widget *src_widget;
 	struct snd_sof_widget *sink_widget;
-	int src_queue;
-	int sink_queue;
 	bool setup;
 
 	void *private;
