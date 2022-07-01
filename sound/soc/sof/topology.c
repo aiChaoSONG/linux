@@ -1884,7 +1884,7 @@ static int sof_route_load(struct snd_soc_component *scomp, int index,
 
 	/* add route to route list */
 	list_add(&sroute->list, &sdev->route_list);
-
+	dev_dbg(scomp->dev, "Route created successfully\n");
 	return 0;
 err:
 	kfree(sroute);

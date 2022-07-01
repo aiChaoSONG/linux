@@ -236,9 +236,14 @@ static int sof_setup_pipeline_connections(struct snd_sof_dev *sdev,
 	 * events. But they are not handled by the firmware. So ignore them.
 	 */
 	if (dir == SNDRV_PCM_STREAM_PLAYBACK) {
+		dev_info(sdev->dev, "Setting up playback route\n");
 		for_each_dapm_widgets(list, i, widget) {
-			if (!widget->dobj.private)
+			dev_info(sdev->dev, "Widget name: %s\n", widget->name);
+			if (!widget->dobj.private) {
+				dev_info(sdev->dev, "No dobj.private for: %s\n", widget->name);
 				continue;
+			}
+
 
 			snd_soc_dapm_widget_for_each_sink_path(widget, p)
 				if (p->sink->dobj.private) {
@@ -248,13 +253,24 @@ static int sof_setup_pipeline_connections(struct snd_sof_dev *sdev,
 				}
 		}
 	} else {
+		dev_info(sdev->dev, "Setting up capture route\n");
 		for_each_dapm_widgets(list, i, widget) {
-			if (!widget->dobj.private)
+			dev_info(sdev->dev, "Widget name: %s\n", widget->name);
+			if (!widget->dobj.private) {
+				dev_info(sdev->dev, "No dobj.private for: %s\n", widget->name);
 				continue;
+			}
 
 			snd_soc_dapm_widget_for_each_source_path(widget, p)
 				if (p->source->dobj.private) {
 					ret = sof_route_setup(sdev, p->source, widget);
+					if (ret < 0)
+						return ret;
+				}
+
+			snd_soc_dapm_widget_for_each_sink_path(widget, p)
+				if (p->sink->dobj.private) {
+					ret = sof_route_setup(sdev, widget, p->sink);
 					if (ret < 0)
 						return ret;
 				}
@@ -485,7 +501,11 @@ int sof_widget_list_setup(struct snd_sof_dev *sdev, struct snd_sof_pcm *spcm,
 	const struct sof_ipc_tplg_ops *ipc_tplg_ops = sdev->ipc->ops->tplg;
 	struct snd_soc_dapm_widget_list *list = spcm->stream[dir].list;
 	struct snd_soc_dapm_widget *widget;
-	int i, ret;
+	int i, j, ret;
+
+	for (j=0; j<list->num_widgets; j++) {
+		dev_info(sdev->dev, "Widget: %d, name:%s\n", j, list->widgets[j]->name);
+	}
 
 	/* nothing to set up */
 	if (!list)

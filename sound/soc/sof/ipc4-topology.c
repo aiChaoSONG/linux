@@ -1502,9 +1502,11 @@ static int sof_ipc4_widget_setup(struct snd_sof_dev *sdev, struct snd_sof_widget
 	struct snd_sof_widget *pipe_widget = swidget->pipe_widget;
 	struct sof_ipc4_pipeline *pipeline;
 	struct sof_ipc4_msg *msg;
+	struct sof_ipc4_msg msg2;
 	void *ipc_data = NULL;
 	u32 ipc_size = 0;
 	int ret;
+	struct sof_ipc4_fw_module *swidget_mod;
 
 	dev_dbg(sdev->dev, "Create widget %s instance %d - pipe %d - core %d\n",
 		swidget->widget->name, swidget->instance_id, swidget->pipeline_id, swidget->core);
@@ -1594,6 +1596,32 @@ static int sof_ipc4_widget_setup(struct snd_sof_dev *sdev, struct snd_sof_widget
 	if (ret < 0)
 		dev_err(sdev->dev, "failed to create module %s\n", swidget->widget->name);
 
+	if(!strcmp(swidget->widget->name, "copier.SSP.8.1")) {
+		swidget_mod = swidget->module_info;
+		dev_info(sdev->dev, "Setup pin1 for: %s\n", swidget->widget->name);
+		u32 large_data[52] = {0x00000001, 0x0000bb80, 0x00000020, 0xFFFFFF10,
+								0x00000001, 0x00000000, 0x00002002, 0x0000bb80,
+								0x00000020, 0xFFFFFF10, 0x00000001, 0x00000000,
+								0x00002002};
+
+		msg2.primary  = swidget_mod->man4_module_entry.id;
+		msg2.primary  |= SOF_IPC4_MOD_INSTANCE(swidget->instance_id);
+		msg2.primary  |= SOF_IPC4_MSG_TYPE_SET(SOF_IPC4_MOD_LARGE_CONFIG_SET);
+		msg2.primary  |= SOF_IPC4_MSG_DIR(SOF_IPC4_MSG_REQUEST);
+		msg2.primary  |= SOF_IPC4_MSG_TARGET(SOF_IPC4_MODULE_MSG);
+
+		msg2.extension = 0;
+		msg2.extension |= SOF_IPC4_MOD_EXT_MSG_SIZE(52);
+		msg2.extension |= SOF_IPC4_MOD_EXT_MSG_PARAM_ID(2);
+		msg2.extension |= SOF_IPC4_MOD_EXT_MSG_LAST_BLOCK(1);
+		msg2.extension |= SOF_IPC4_MOD_EXT_MSG_FIRST_BLOCK(1);
+
+		msg2.data_ptr = &large_data;
+
+		msg2.data_size = 52;
+		ret = sof_ipc_tx_message(sdev->ipc, &msg2, 52, NULL, 0);
+	}
+
 	return ret;
 }
 
@@ -1638,9 +1666,26 @@ static int sof_ipc4_route_setup(struct snd_sof_dev *sdev, struct snd_sof_route *
 	int dst_queue = 0;
 	int ret;
 
+	if (!strcmp(src_widget->widget->name,"copier.SSP.8.1") &&
+		!strcmp(sink_widget->widget->name,"smart_amp.1.1")) {
+		src_queue = 0;
+		dst_queue = 1;
+	}
+
+	if (!strcmp(src_widget->widget->name,"copier.host.1.1") &&
+		!strcmp(sink_widget->widget->name,"smart_amp.1.1")) {
+		src_queue = 0;
+		dst_queue = 0;
+	}
+
+	if (!strcmp(src_widget->widget->name,"copier.SSP.8.1") &&
+		!strcmp(sink_widget->widget->name,"copier.host.7.1")) {
+		src_queue = 1;
+		dst_queue = 0;
+	}
+
 	dev_dbg(sdev->dev, "bind %s -> %s\n",
 		src_widget->widget->name, sink_widget->widget->name);
-	dev_info(sdev->dev, "src queue: %u, dst queue: %u\n", sroute->src_queue,sroute->sink_queue);
 
 	header = src_fw_module->man4_module_entry.id;
 	header |= SOF_IPC4_MOD_INSTANCE(src_widget->instance_id);
@@ -1653,6 +1698,7 @@ static int sof_ipc4_route_setup(struct snd_sof_dev *sdev, struct snd_sof_route *
 	extension |= SOF_IPC4_MOD_EXT_DST_MOD_QUEUE_ID(dst_queue);
 	extension |= SOF_IPC4_MOD_EXT_SRC_MOD_QUEUE_ID(src_queue);
 
+
 	msg.primary = header;
 	msg.extension = extension;
 
@@ -1661,20 +1707,7 @@ static int sof_ipc4_route_setup(struct snd_sof_dev *sdev, struct snd_sof_route *
 		dev_err(sdev->dev, "%s: failed to bind modules %s -> %s\n",
 			__func__, src_widget->widget->name, sink_widget->widget->name);
 
-	if(sroute->src_queue == 1) {
-		dev_info(sdev->dev, "Primary MSG: %u\n", header);
-		u32 large_data[0x34] = {0x00000001, 0x0000bb80, 0x00000020, 0xFFFFFF10, 0x00000001, 0x00000000, 0x00001802, 0x0000bb80, 0x00000020, 0xFFFFFF10, 0x00000001, 0x00000000, 0x00001802};
-
-		msg.primary = 0x44010004;
-
-		msg.extension = 0x20200034;
-
-		msg.data_ptr = large_data;
-
-		msg.data_size = 0x34;
-
-        sdev->ipc->ops->set_get_data(sdev, &msg, 0x34, true);
-	}
+	dev_info(sdev->dev, "Primary MSG for route: %u\n", header);
 
 	return ret;
 }
@@ -1690,6 +1723,24 @@ static int sof_ipc4_route_free(struct snd_sof_dev *sdev, struct snd_sof_route *s
 	int src_queue = 0;
 	int dst_queue = 0;
 	int ret;
+
+	if (!strcmp(src_widget->widget->name,"copier.SSP.8.1") &&
+		!strcmp(sink_widget->widget->name,"smart_amp.1.1")) {
+		src_queue = 0;
+		dst_queue = 1;
+	}
+
+	if (!strcmp(src_widget->widget->name,"copier.host.1.1") &&
+		!strcmp(sink_widget->widget->name,"smart_amp.1.1")) {
+		src_queue = 0;
+		dst_queue = 0;
+	}
+
+	if (!strcmp(src_widget->widget->name,"copier.SSP.8.1") &&
+		!strcmp(sink_widget->widget->name,"copier.host.7.1")) {
+		src_queue = 1;
+		dst_queue = 0;
+	}
 
 	dev_dbg(sdev->dev, "unbind modules %s -> %s\n",
 		src_widget->widget->name, sink_widget->widget->name);

@@ -89,7 +89,7 @@ sof_pcm_setup_connected_widgets(struct snd_sof_dev *sdev, struct snd_soc_pcm_run
 				struct snd_sof_platform_stream_params *platform_params, int dir)
 {
 	struct snd_soc_dai *dai;
-	int ret, j;
+	int ret, j, k;
 
 	/* query DAPM for list of connected widgets and set them up */
 	for_each_rtd_cpu_dais(rtd, j, dai) {
@@ -102,7 +102,9 @@ sof_pcm_setup_connected_widgets(struct snd_sof_dev *sdev, struct snd_soc_pcm_run
 				dir == SNDRV_PCM_STREAM_PLAYBACK ? "playback" : "capture");
 			return ret;
 		}
-
+	for (k=0; k<list->num_widgets; k++) {
+		dev_info(sdev->dev, "DAPM Widget: %d, name:%s\n", j, list->widgets[j]->name);
+	}
 		spcm->stream[dir].list = list;
 
 		ret = sof_widget_list_setup(sdev, spcm, params, platform_params, dir);
