@@ -34,6 +34,10 @@
 #define SOF_PIN_TYPE_SINK	0
 #define SOF_PIN_TYPE_SOURCE	1
 
+/* Widget initialization blob style */
+#define SOF_INIT_BLOB_BASE_WITH_MOD_EXT	0
+#define SOF_INIT_BLOB_BASE_WITH_BASE_EXT	1
+
 /* max number of FE PCMs before BEs */
 #define SOF_BE_PCM_BASE		16
 
@@ -413,6 +417,16 @@ struct snd_sof_widget {
 	 * Please see ipc4-topology.h for each module's init instance ipc message payload format.
 	 */
 	bool payload_with_output_fmt;
+
+	/*
+	 * Among all SOF IPC4 modules, there are two styles of module initialization blob:
+	 *   - Base Module Config + Module Specific Extension
+	 *   - Base Module Config + Base Module Config Extension
+	 * The first one is commonly used by basefw modules, and the second one is commonly
+	 * used by Intel Audio Development Kit (IADK) modules.
+	 * This flag is used to denote which initialization blob style a widget is using.
+	 */
+	int init_blob_style;
 
 	struct snd_soc_dapm_widget *widget;
 	struct list_head list;	/* list in sdev widget list */
