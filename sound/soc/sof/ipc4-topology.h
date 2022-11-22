@@ -345,4 +345,24 @@ struct sof_ipc4_process {
 	struct sof_ipc4_msg msg;
 };
 
+struct sof_ipc4_pin_format {
+	u32 pin_index;
+	union {
+		u32 ibs;
+		u32 obs;
+	};
+	struct sof_ipc4_audio_format audio_fmt;
+};
+
+struct sof_ipc4_base_module_cfg_ext {
+	u16 num_sink_pins;
+	u16 num_source_pins;
+	u8 reserved[8];
+	/* length of optional module specific parameters that follow this structure */
+	u32 priv_param_len;
+	struct sof_ipc4_pin_format sink_pin_fmt[0];
+	struct sof_ipc4_pin_format source_pin_fmt[0];
+	u8 priv[0]; /* module specific parmeters */
+};
+
 #endif
