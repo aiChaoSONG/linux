@@ -102,6 +102,8 @@ static const struct sof_topology_token comp_ext_tokens[] = {
 		offsetof(struct snd_sof_widget, uuid)},
 	{SOF_TKN_COMP_PAYLOAD_WITH_OUTPUT_FMT, SND_SOC_TPLG_TUPLE_TYPE_BOOL, get_token_u16,
 		offsetof(struct snd_sof_widget, payload_with_output_fmt)},
+	{SOF_TKN_COMP_FORCE_ROUTE_SETUP, SND_SOC_TPLG_TUPLE_TYPE_BOOL, get_token_u16,
+		offsetof(struct snd_sof_widget, force_route_setup)},
 	{SOF_TKN_COMP_INIT_BLOB_STYLE, SND_SOC_TPLG_TUPLE_TYPE_WORD, get_token_u32,
 		offsetof(struct snd_sof_widget, init_blob_style)},
 };
@@ -1996,6 +1998,8 @@ sof_ipc4_get_widget_pin_format(struct snd_sof_widget *swidget, int pin_id,
 	int num_pins;
 	int i;
 
+	dev_info(swidget->scomp->dev, "[CHAO]pin_id : %d, pin_type:%d\n", pin_id, pin_type);
+	dev_info(swidget->scomp->dev, "[CHAO] %s blob_style:%d\n", swidget->widget->name, swidget->init_blob_style);
 	/*
 	 * For modules use Base Module Config + Module Specific Config style initialization
 	 * blob, return the audio format in base module config.
@@ -2051,15 +2055,30 @@ static int sof_ipc4_set_copier_sink_format(struct snd_sof_dev *sdev,
 					   struct snd_sof_widget *sink_widget,
 					   int sink_id)
 {
-	struct sof_ipc4_base_module_cfg *src_config = src_widget->private;
+	struct sof_ipc4_base_module_cfg *src_config;
 	struct sof_ipc4_copier_config_set_sink_format format;
 	const struct sof_ipc4_audio_format *sink_format;
 	struct sof_ipc4_fw_module *fw_module;
+	struct snd_sof_dai *dai;
 	struct sof_ipc4_msg msg = {{ 0 }};
 	u32 header, extension;
 
 	dev_dbg(sdev->dev, "%s set copier sink %d format\n",
 		src_widget->widget->name, sink_id);
+
+	if (WIDGET_IS_DAI(src_widget->id)) {
+		dai = src_widget->private;
+		src_config = dai->private;
+	} else
+		src_config = src_widget->private;
+
+	dev_info(sdev->dev, "[Chao] basecfg: cpc:%d, ibs:%d, obs:%d, is_pages:%d\n",
+			src_config->cpc, src_config->ibs, src_config->obs, src_config->is_pages);
+	dev_info(sdev->dev, "[Chao] freq: %x, bit_depth:%x, ch_map:%x, ch_cfg:%x\n",
+		src_config->audio_fmt.sampling_frequency, src_config->audio_fmt.bit_depth,
+		src_config->audio_fmt.ch_map, src_config->audio_fmt.ch_cfg);
+	dev_info(sdev->dev, "[Chao] interleave style:%x, fmt_cfg:%x\n",
+		src_config->audio_fmt.interleaving_style, src_config->audio_fmt.fmt_cfg);
 
 	fw_module = src_widget->module_info;
 

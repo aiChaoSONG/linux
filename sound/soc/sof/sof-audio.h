@@ -428,6 +428,8 @@ struct snd_sof_widget {
 	 */
 	int init_blob_style;
 
+	bool force_route_setup;
+
 	struct snd_soc_dapm_widget *widget;
 	struct list_head list;	/* list in sdev widget list */
 	struct snd_sof_pipeline *spipe;

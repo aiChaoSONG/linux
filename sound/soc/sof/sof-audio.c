@@ -253,6 +253,8 @@ static int sof_setup_pipeline_connections(struct snd_sof_dev *sdev,
 					  struct snd_soc_dapm_widget_list *list, int dir)
 {
 	struct snd_soc_dapm_widget *widget;
+	struct snd_sof_widget *src_swidget;
+	struct snd_sof_widget *sink_swidget;
 	struct snd_soc_dapm_path *p;
 	int ret;
 	int i;
@@ -290,6 +292,19 @@ static int sof_setup_pipeline_connections(struct snd_sof_dev *sdev,
 
 				if (p->source->dobj.private) {
 					ret = sof_route_setup(sdev, p->source, widget);
+					if (ret < 0)
+						return ret;
+				}
+			}
+
+			snd_soc_dapm_widget_for_each_sink_path(widget, p) {
+				src_swidget = widget->dobj.private;
+				sink_swidget = p->sink->dobj.private;
+
+				if (src_swidget && sink_swidget && src_swidget->force_route_setup &&
+					sink_swidget->force_route_setup)
+				{
+					ret = sof_route_setup(sdev, widget, p->sink);
 					if (ret < 0)
 						return ret;
 				}
