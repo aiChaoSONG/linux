@@ -167,6 +167,77 @@ static void sof_ipc4_dbg_audio_format(struct device *dev,
 	}
 }
 
+const static struct sof_ipc4_audio_format *
+sof_ipc4_get_widget_pin_format(struct snd_sof_widget *swidget, int pin_id,
+				bool pin_type)
+{
+	struct sof_ipc4_base_module_cfg *base_config = swidget->private;
+	struct snd_soc_dapm_widget *widget = swidget->widget;
+	struct sof_ipc4_base_module_cfg_ext *base_ext = NULL;
+	struct sof_ipc4_pin_format *pin_fmt;
+	struct sof_ipc4_control_data *control_data;
+	const struct snd_kcontrol_new *kc;
+	struct snd_sof_control *scontrol;
+	struct soc_bytes_ext *sbe;
+	int i;
+	int pin_start, pin_end;
+
+	dev_info(swidget->scomp->dev, "[CHAO]pin_id : %d, pin_type:%d\n", pin_id, pin_type);
+	dev_info(swidget->scomp->dev, "[CHAO] %s blob_style:%d\n", swidget->widget->name, swidget->init_blob_style);
+	/*
+	 * For modules use Base Module Config + Module Specific Config style initialization
+	 * blob, return the audio format in base module config.
+	 */
+	if (swidget->init_blob_style == SOF_INIT_BLOB_BASE_WITH_MOD_EXT) {
+		return &base_config->audio_fmt;
+	}
+
+	/*
+	 * For modules use Base Module Config + Base Module Config Extension style
+	 * initialization blob, find and return the pin format from the initialization
+	 * blob in bytes kcontrol.
+	 */
+	for (i = 0; i < widget->num_kcontrols; i++) {
+		kc = &widget->kcontrol_news[i];
+
+		/* payload uses byte kcontrol */
+		if (widget->dobj.widget.kcontrol_type[i] != SND_SOC_TPLG_TYPE_BYTES)
+			continue;
+		sbe = (struct soc_bytes_ext *)kc->private_value;
+		scontrol = sbe->dobj.private;
+		if (!scontrol)
+			continue;
+		control_data = scontrol->ipc_control_data;
+		if (control_data->data->blob_type != SOF_IPC4_MOD_INIT_INSTANCE)
+			continue;
+
+		base_ext = (struct sof_ipc4_base_module_cfg_ext *)control_data->data->data;
+		break;
+	}
+
+	if (!base_ext)
+		return NULL;
+
+	dev_info(swidget->scomp->dev, "[Chao] base_ext pins: %d, %d\n", base_ext->num_sink_pins, base_ext->num_source_pins);
+
+	pin_fmt = base_ext->sink_pin_fmt;
+	if (pin_type == SOF_PIN_TYPE_SINK) {
+		pin_start = 0;
+		pin_end = base_ext->num_sink_pins;
+	} else {
+		pin_start = base_ext->num_sink_pins;
+		pin_end = base_ext->num_sink_pins + base_ext->num_source_pins;
+	}
+	dev_info(swidget->scomp->dev, "[Chao] pin: %d/%d, addr: %p]\n", pin_start, pin_end, pin_fmt);
+	for (; pin_start < pin_end; pin_start++) {
+		dev_info(swidget->scomp->dev, "[Chao] i %d, %p\n", pin_start, &pin_fmt[i]);
+		if (pin_fmt[pin_start].pin_index == pin_id)
+			return &(pin_fmt[pin_start].audio_fmt);
+	}
+
+	return NULL;
+}
+
 /**
  * sof_ipc4_get_audio_fmt - get available audio formats from swidget->tuples
  * @scomp: pointer to pointer to SOC component
@@ -1527,6 +1598,7 @@ static int sof_ipc4_prepare_process_module(struct snd_sof_widget *swidget,
 	struct sof_ipc4_process *process = swidget->private;
 	struct sof_ipc4_available_audio_format *available_fmt = &process->available_fmt;
 	struct sof_ipc4_base_module_cfg_ext *base_ext;
+	const struct sof_ipc4_audio_format *out_fmt;
 	struct sof_ipc4_control_data *control_data;
 	struct snd_sof_control *scontrol = NULL;
 	void *cfg = process->ipc_config_data;
@@ -1608,6 +1680,21 @@ static int sof_ipc4_prepare_process_module(struct snd_sof_widget *swidget,
 	}
 
 	memcpy(cfg, data, control_data->data->size);
+
+	/* update pipeline params */
+	out_fmt = sof_ipc4_get_widget_pin_format(swidget, 0, SOF_PIN_TYPE_SOURCE);
+
+	dev_info(sdev->dev, "[Chao]Outpin0 freq: %x, bit_depth:%x, ch_map:%x, ch_cfg:%x\n",
+		out_fmt->sampling_frequency, out_fmt->bit_depth,
+		out_fmt->ch_map,out_fmt->ch_cfg);
+	dev_info(sdev->dev, "[Chao]outpin0: interleave style:%x, fmt_cfg:%x\n",
+		out_fmt->interleaving_style,out_fmt->fmt_cfg);
+
+	hw_param_interval(pipeline_params, SNDRV_PCM_HW_PARAM_CHANNELS)->min
+		= SOF_IPC4_AUDIO_FORMAT_CFG_CHANNELS_COUNT(out_fmt->fmt_cfg);
+	hw_param_interval(pipeline_params, SNDRV_PCM_HW_PARAM_CHANNELS)->max
+		= SOF_IPC4_AUDIO_FORMAT_CFG_CHANNELS_COUNT(out_fmt->fmt_cfg);
+
 	return 0;
 }
 
@@ -1983,73 +2070,6 @@ static void sof_ipc4_put_queue_id(struct snd_sof_widget *swidget, int queue_id,
 	ida_free(queue_ida, queue_id);
 }
 
-const static struct sof_ipc4_audio_format *
-sof_ipc4_get_widget_pin_format(struct snd_sof_widget *swidget, int pin_id,
-				bool pin_type)
-{
-	struct sof_ipc4_base_module_cfg *base_config = swidget->private;
-	struct snd_soc_dapm_widget *widget = swidget->widget;
-	struct sof_ipc4_base_module_cfg_ext *base_ext = NULL;
-	struct sof_ipc4_pin_format *pin_fmt;
-	struct sof_ipc4_control_data *control_data;
-	const struct snd_kcontrol_new *kc;
-	struct snd_sof_control *scontrol;
-	struct soc_bytes_ext *sbe;
-	int num_pins;
-	int i;
-
-	dev_info(swidget->scomp->dev, "[CHAO]pin_id : %d, pin_type:%d\n", pin_id, pin_type);
-	dev_info(swidget->scomp->dev, "[CHAO] %s blob_style:%d\n", swidget->widget->name, swidget->init_blob_style);
-	/*
-	 * For modules use Base Module Config + Module Specific Config style initialization
-	 * blob, return the audio format in base module config.
-	 */
-	if (swidget->init_blob_style == SOF_INIT_BLOB_BASE_WITH_MOD_EXT) {
-		return &base_config->audio_fmt;
-	}
-
-	/*
-	 * For modules use Base Module Config + Base Module Config Extension style
-	 * initialization blob, find and return the pin format from the initialization
-	 * blob in bytes kcontrol.
-	 */
-	for (i = 0; i < widget->num_kcontrols; i++) {
-		kc = &widget->kcontrol_news[i];
-
-		/* payload uses byte kcontrol */
-		if (widget->dobj.widget.kcontrol_type[i] != SND_SOC_TPLG_TYPE_BYTES)
-			continue;
-		sbe = (struct soc_bytes_ext *)kc->private_value;
-		scontrol = sbe->dobj.private;
-		if (!scontrol)
-			continue;
-		control_data = scontrol->ipc_control_data;
-		if (control_data->data->blob_type != SOF_IPC4_MOD_INIT_INSTANCE)
-			continue;
-
-		base_ext = (struct sof_ipc4_base_module_cfg_ext *)control_data->data->data;
-		break;
-	}
-
-	if (!base_ext)
-		return NULL;
-
-	if (pin_type == SOF_PIN_TYPE_SINK) {
-		num_pins = base_ext->num_sink_pins;
-		pin_fmt = base_ext->sink_pin_fmt;
-	} else {
-		num_pins = base_ext->num_source_pins;
-		pin_fmt = base_ext->sink_pin_fmt +
-				 base_ext->num_sink_pins * sizeof(struct sof_ipc4_pin_format);
-	}
-	for (i = 0; i < num_pins; i++) {
-		if (pin_fmt[i].pin_index == pin_id)
-			return &pin_fmt[i].audio_fmt;
-	}
-
-	return NULL;
-}
-
 static int sof_ipc4_set_copier_sink_format(struct snd_sof_dev *sdev,
 					   struct snd_sof_widget *src_widget,
 					   struct snd_sof_widget *sink_widget,
@@ -2092,6 +2112,13 @@ static int sof_ipc4_set_copier_sink_format(struct snd_sof_dev *sdev,
 		return -EINVAL;
 	}
 	memcpy(&format.sink_fmt, sink_format, sizeof(format.sink_fmt));
+
+	dev_info(sdev->dev, "[Chao]sink: freq: %x, bit_depth:%x, ch_map:%x, ch_cfg:%x\n",
+		format.sink_fmt.sampling_frequency, format.sink_fmt.bit_depth,
+		format.sink_fmt.ch_map, format.sink_fmt.ch_cfg);
+	dev_info(sdev->dev, "[Chao]sink: interleave style:%x, fmt_cfg:%x\n",
+		format.sink_fmt.interleaving_style,format.sink_fmt.fmt_cfg);
+
 	msg.data_size = sizeof(format);
 	msg.data_ptr = &format;
 
