@@ -298,6 +298,7 @@ struct sof_ipc_pipe_comp_connect {
 enum sof_event_types {
 	SOF_EVENT_NONE = 0,
 	SOF_KEYWORD_DETECT_DAPM_EVENT,
+	SOF_SMART_AMP_FB_DAPM_EVENT,
 };
 
 #endif

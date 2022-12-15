@@ -2470,6 +2470,71 @@ static int sof_ipc4_link_setup(struct snd_sof_dev *sdev, struct snd_soc_dai_link
 	return 0;
 }
 
+static int sof_ipc4_setup_smart_amp_fb_route(struct snd_sof_dev *sdev,
+				struct snd_soc_dapm_widget *widget)
+{
+	struct snd_soc_dapm_path *p;
+	int ret;
+
+	snd_soc_dapm_widget_for_each_sink_path(widget, p) {
+		if (p->sink->dobj.private) {
+			ret = sof_route_setup(sdev, widget, p->sink);
+			if (ret < 0)
+				return ret;
+		}
+	}
+	return 0;
+}
+
+static int sof_ipc4_smart_amp_fb_dapm_event(struct snd_soc_dapm_widget *w,
+				       struct snd_kcontrol *k, int event)
+{
+	struct snd_sof_widget *swidget = w->dobj.private;
+	struct snd_soc_component *scomp = swidget->scomp;
+	struct snd_sof_dev *sdev;
+	int ret = 0;
+
+	dev_dbg(scomp->dev, "received event %d for widget %s\n",
+		event, w->name);
+
+	/* process events */
+	switch (event) {
+	case SND_SOC_DAPM_PRE_PMU:
+		sdev = snd_soc_component_get_drvdata(scomp);
+		ret = sof_ipc4_setup_smart_amp_fb_route(sdev, w);
+		break;
+	default:
+		break;
+	}
+
+	return ret;
+}
+
+/* event handlers for setting smart amp feedback route */
+static const struct snd_soc_tplg_widget_events sof_smart_amp_events[] = {
+	{SOF_SMART_AMP_FB_DAPM_EVENT, sof_ipc4_smart_amp_fb_dapm_event},
+};
+
+static int sof_ipc4_widget_bind_event(struct snd_soc_component *scomp,
+				      struct snd_sof_widget *swidget, u16 event_type)
+{
+	/* validate widget event type */
+	switch (event_type) {
+	case SOF_SMART_AMP_FB_DAPM_EVENT:
+
+		/* bind event to smart amp feedback widget */
+		return snd_soc_tplg_widget_bind_event(swidget->widget, sof_smart_amp_events,
+						      ARRAY_SIZE(sof_smart_amp_events), event_type);
+	default:
+		break;
+	}
+
+	dev_err(scomp->dev, "Invalid event type %d for widget %s\n", event_type,
+		swidget->widget->name);
+
+	return -EINVAL;
+}
+
 static enum sof_tokens common_copier_token_list[] = {
 	SOF_COMP_TOKENS,
 	SOF_AUDIO_FMT_NUM_TOKENS,
@@ -2573,7 +2638,7 @@ static const struct sof_ipc_tplg_widget_ops tplg_ipc4_widget_ops[SND_SOC_DAPM_TY
 	[snd_soc_dapm_effect] = {sof_ipc4_widget_setup_comp_process,
 				sof_ipc4_widget_free_comp_process,
 				process_token_list, ARRAY_SIZE(process_token_list),
-				NULL, sof_ipc4_prepare_process_module,
+				sof_ipc4_widget_bind_event, sof_ipc4_prepare_process_module,
 				NULL},
 };
 
