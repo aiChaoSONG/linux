@@ -341,6 +341,7 @@ struct sof_ipc4_src {
  * @ipc_config_data: Process module config data
  * @ipc_config_size: Size of process module config data
  * @msg: IPC4 message struct containing header and data info
+ * @cdata: The control data used by process module
  */
 struct sof_ipc4_process {
 	struct sof_ipc4_base_module_cfg base_config;
@@ -349,6 +350,7 @@ struct sof_ipc4_process {
 	void *ipc_config_data;
 	uint32_t ipc_config_size;
 	struct sof_ipc4_msg msg;
+	struct sof_ipc4_control_data *cdata;
 	/*
 	 * payload_with_output_fmt is used to describe whether there is output format
 	 * (struct sof_ipc4_audio_format output_format) in the module init instance

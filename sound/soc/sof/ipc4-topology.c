@@ -173,6 +173,40 @@ static void sof_ipc4_dbg_audio_format(struct device *dev,
 	}
 }
 
+static int sof_ipc4_setup_process_set_cdata(struct snd_sof_widget *swidget)
+{
+	struct snd_soc_dapm_widget *widget = swidget->widget;
+	struct sof_ipc4_process *process = swidget->private;
+	struct sof_ipc4_control_data *control_data;
+	const struct snd_kcontrol_new *kc;
+	struct snd_sof_control *scontrol;
+	struct soc_bytes_ext *sbe;
+	int i;
+
+	/*
+	 * There should be zero or one byte kcontrol for module instance
+	 * initialization per process module, if more than one are provided
+	 * from topology, the first found in widget kcontrol list will be used.
+	 */
+	for (i = 0; i < widget->num_kcontrols; i++) {
+		kc = &widget->kcontrol_news[i];
+
+		if (widget->dobj.widget.kcontrol_type[i] != SND_SOC_TPLG_TYPE_BYTES)
+			continue;
+		sbe = (struct soc_bytes_ext *)kc->private_value;
+		scontrol = sbe->dobj.private;
+		if (!scontrol)
+			continue;
+		control_data = scontrol->ipc_control_data;
+		if (control_data->data->blob_type != SOF_IPC4_MOD_INIT_INSTANCE)
+			continue;
+
+		process->cdata = control_data;
+		break;
+	}
+	return 0;
+}
+
 /**
  * sof_ipc4_get_audio_fmt - get available audio formats from swidget->tuples
  * @scomp: pointer to pointer to SOC component
@@ -864,10 +898,8 @@ static void sof_ipc4_widget_free_comp_mixer(struct snd_sof_widget *swidget)
 static int sof_ipc4_widget_setup_comp_process(struct snd_sof_widget *swidget)
 {
 	struct snd_soc_component *scomp = swidget->scomp;
-	struct snd_sof_dev *sdev = snd_soc_component_get_drvdata(scomp);
 	struct sof_ipc4_control_data *control_data;
 	struct sof_ipc4_process *process;
-	struct snd_sof_control *scontrol;
 	int cfg_size;
 	void *cfg;
 	int ret;
@@ -893,17 +925,11 @@ static int sof_ipc4_widget_setup_comp_process(struct snd_sof_widget *swidget)
 	if (process->payload_with_output_fmt)
 		cfg_size += sizeof(struct sof_ipc4_audio_format);
 
-	/* allocate memory for module config */
-	list_for_each_entry(scontrol, &sdev->kcontrol_list, list) {
-		if (scontrol->comp_id == swidget->comp_id) {
-			control_data = scontrol->ipc_control_data;
+	sof_ipc4_setup_process_set_cdata(swidget);
 
-			if (control_data->data->blob_type == SOF_IPC4_MOD_INIT_INSTANCE) {
-				cfg_size += control_data->data->size;
-				break;
-			}
-		}
-	}
+	control_data = process->cdata;
+	if (control_data)
+		cfg_size += control_data->data->size;
 
 	cfg = kzalloc(cfg_size, GFP_KERNEL);
 	if (!cfg) {
@@ -1629,16 +1655,11 @@ static int sof_ipc4_prepare_process_module(struct snd_sof_widget *swidget,
 {
 	struct snd_soc_component *scomp = swidget->scomp;
 	struct snd_sof_dev *sdev = snd_soc_component_get_drvdata(scomp);
-	struct snd_soc_dapm_widget *widget = swidget->widget;
 	struct sof_ipc4_process *process = swidget->private;
 	struct sof_ipc4_available_audio_format *available_fmt = &process->available_fmt;
 	struct sof_ipc4_control_data *control_data;
-	struct snd_sof_control *scontrol = NULL;
 	void *cfg = process->ipc_config_data;
-	const struct snd_kcontrol_new *kc;
-	struct soc_bytes_ext *sbe;
-	void *data;
-	int ret, i;
+	int ret;
 
 	available_fmt->ref_audio_fmt = &available_fmt->base_config->audio_fmt;
 
@@ -1674,24 +1695,9 @@ static int sof_ipc4_prepare_process_module(struct snd_sof_widget *swidget,
 		cfg += sizeof(struct sof_ipc4_audio_format);
 	}
 
-	for (i = 0; i < widget->num_kcontrols; i++) {
-		kc = &widget->kcontrol_news[i];
-
-		/* payload uses byte kcontrol */
-		if (widget->dobj.widget.kcontrol_type[i] != SND_SOC_TPLG_TYPE_BYTES)
-			continue;
-		sbe = (struct soc_bytes_ext *)kc->private_value;
-		scontrol = sbe->dobj.private;
-		if (!scontrol)
-			continue;
-		control_data = scontrol->ipc_control_data;
-		if (control_data->data->blob_type != SOF_IPC4_MOD_INIT_INSTANCE)
-			continue;
-
-		data = (void *)control_data->data->data;
-		memcpy(cfg, data, control_data->data->size);
-		break;
-	}
+	control_data = process->cdata;
+	if (control_data)
+		memcpy(cfg, control_data->data->data, control_data->data->size);
 
 	return 0;
 }
