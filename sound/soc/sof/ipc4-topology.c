@@ -197,6 +197,32 @@ static void sof_ipc4_dbg_audio_format(struct device *dev,
 	}
 }
 
+static const struct sof_ipc4_audio_format *
+sof_ipc4_get_sink_pin_fmt(struct snd_sof_widget *swidget, int pin_index)
+{
+	struct sof_ipc4_process *process;
+	int i;
+
+	if (swidget->id != snd_soc_dapm_effect) {
+		struct sof_ipc4_base_module_cfg *base = swidget->private;
+
+		/* For non-process modules, base module config format is used for all sink pins */
+		return &base->audio_fmt;
+	}
+
+	process = swidget->private;
+
+	for (i = 0; i < 2 * SOF_WIDGET_MAX_NUM_PINS; i++) {
+		struct sof_ipc4_pin_info *pin_info = &process->pin_info[i];
+
+		if (pin_info->pin_type == SOF_PIN_TYPE_SINK &&
+		    pin_info->fmt.pin_index == pin_index)
+			return &pin_info->fmt.audio_fmt;
+	}
+
+	return NULL;
+}
+
 /**
  * sof_ipc4_get_audio_fmt - get available audio formats from swidget->tuples
  * @scomp: pointer to pointer to SOC component
@@ -2219,9 +2245,9 @@ static int sof_ipc4_set_copier_sink_format(struct snd_sof_dev *sdev,
 					   struct snd_sof_widget *sink_widget,
 					   int sink_id)
 {
-	struct sof_ipc4_base_module_cfg *sink_config = sink_widget->private;
-	struct sof_ipc4_base_module_cfg *src_config;
 	struct sof_ipc4_copier_config_set_sink_format format;
+	struct sof_ipc4_base_module_cfg *src_config;
+	const struct sof_ipc4_audio_format *pin_fmt;
 	struct sof_ipc4_fw_module *fw_module;
 	struct sof_ipc4_msg msg = {{ 0 }};
 	u32 header, extension;
@@ -2241,7 +2267,16 @@ static int sof_ipc4_set_copier_sink_format(struct snd_sof_dev *sdev,
 
 	format.sink_id = sink_id;
 	memcpy(&format.source_fmt, &src_config->audio_fmt, sizeof(format.source_fmt));
-	memcpy(&format.sink_fmt, &sink_config->audio_fmt, sizeof(format.sink_fmt));
+
+	pin_fmt = sof_ipc4_get_sink_pin_fmt(sink_widget, sink_id);
+	if (!pin_fmt) {
+		dev_err(sdev->dev, "Unable to get pin %d format for %s",
+			sink_id, sink_widget->widget->name);
+		return -EINVAL;
+	}
+
+	memcpy(&format.sink_fmt, pin_fmt, sizeof(format.sink_fmt));
+
 	msg.data_size = sizeof(format);
 	msg.data_ptr = &format;
 
