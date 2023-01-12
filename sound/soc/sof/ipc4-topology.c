@@ -206,6 +206,20 @@ static int sof_ipc4_setup_process_set_cdata(struct snd_sof_widget *swidget)
 		process->cdata = control_data;
 		break;
 	}
+
+	if (process->payload_with_base_cfg_ext && process->cdata) {
+		struct snd_soc_component *scomp = swidget->scomp;
+		struct sof_ipc4_base_module_cfg_ext *base_ext;
+		struct sof_ipc4_control_data *control_data;
+
+		control_data = process->cdata;
+		base_ext = (struct sof_ipc4_base_module_cfg_ext *)control_data->data->data;
+		if (!base_ext->num_sink_pin_fmts || !base_ext->num_source_pin_fmts) {
+			dev_err(scomp->dev, "Invalid number of pin formats in config extension for %s\n",
+				swidget->widget->name);
+			return -EINVAL;
+		}
+	}
 	return 0;
 }
 
@@ -927,7 +941,9 @@ static int sof_ipc4_widget_setup_comp_process(struct snd_sof_widget *swidget)
 	if (process->payload_with_output_fmt)
 		cfg_size += sizeof(struct sof_ipc4_audio_format);
 
-	sof_ipc4_setup_process_set_cdata(swidget);
+	ret = sof_ipc4_setup_process_set_cdata(swidget);
+	if (ret)
+		goto free_available_fmt;
 
 	control_data = process->cdata;
 	if (control_data)
