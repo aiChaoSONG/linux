@@ -357,6 +357,7 @@ struct sof_ipc4_process {
 	 * ipc message payload blob.
 	 */
 	bool payload_with_output_fmt;
+	bool payload_with_base_cfg_ext;
 };
 
 /**

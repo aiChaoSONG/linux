@@ -126,6 +126,8 @@ static const struct sof_topology_token src_tokens[] = {
 static const struct sof_topology_token process_tokens[] = {
 	{SOF_TKN_PROCESS_PAYLOAD_WITH_OUTPUT_FMT, SND_SOC_TPLG_TUPLE_TYPE_BOOL, get_token_u16,
 		offsetof(struct sof_ipc4_process, payload_with_output_fmt)},
+	{SOF_TKN_PROCESS_PAYLOAD_WITH_BASE_CFG_EXT, SND_SOC_TPLG_TUPLE_TYPE_BOOL, get_token_u16,
+		offsetof(struct sof_ipc4_process, payload_with_base_cfg_ext)},
 };
 
 static const struct sof_token_info ipc4_token_list[SOF_TOKEN_COUNT] = {
