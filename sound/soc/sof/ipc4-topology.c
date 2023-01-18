@@ -923,8 +923,21 @@ static int sof_ipc4_widget_setup_comp_process(struct snd_sof_widget *swidget)
 	}
 
 	cfg_size = sizeof(struct sof_ipc4_base_module_cfg);
-	if (process->init_payload_format == INIT_PAYLOAD_WITH_OUTPUT_FMT)
+	switch (process->init_payload_format) {
+	case INIT_PAYLOAD_WITH_OUTPUT_FMT:
 		cfg_size += sizeof(struct sof_ipc4_audio_format);
+		break;
+	case INIT_PAYLOAD_WITH_BASE_CFG_EXT:
+	{
+		struct sof_ipc4_base_module_cfg_ext *base_cfg_ext;
+
+		cfg_size += struct_size(base_cfg_ext, pin_formats,
+					swidget->num_sink_pins + swidget->num_source_pins);
+		break;
+	}
+	default:
+		break;
+	}
 
 	/* allocate memory for module config */
 	list_for_each_entry(scontrol, &sdev->kcontrol_list, list) {
@@ -1648,6 +1661,87 @@ static int sof_ipc4_prepare_src_module(struct snd_sof_widget *swidget,
 	return 0;
 }
 
+static int
+sof_ipc4_process_set_pin_formats(struct snd_sof_widget *swidget,
+				 struct sof_ipc4_pin_format *pin_format, int num_pins,
+				 int pin_type)
+{
+	struct sof_ipc4_process *process = swidget->private;
+	struct snd_soc_component *scomp = swidget->scomp;
+	int i, j;
+
+	for (i = 0; i < num_pins; i++, pin_format++) {
+		/* Pin 0 audio formats are derived from the base config input/output format */
+		if (i == 0) {
+			if (pin_type == SOF_PIN_TYPE_SINK) {
+				pin_format->buffer_size = process->base_config.ibs;
+				pin_format->audio_fmt = process->base_config.audio_fmt;
+			} else {
+				pin_format->buffer_size = process->base_config.obs;
+				pin_format->audio_fmt = process->output_format;
+			}
+			continue;
+		}
+
+		/* For all other pins, find the pin formats from those set in topology */
+		for (j = 0; j < 2 * SOF_WIDGET_MAX_NUM_PINS; j++) {
+			struct sof_ipc4_pin_info pin_info = process->pin_info[j];
+
+			if (pin_info.pin_type == pin_type && pin_info.fmt.pin_index == i) {
+				*pin_format = pin_info.fmt;
+				break;
+			}
+		}
+
+		if (j == 2 * SOF_WIDGET_MAX_NUM_PINS) {
+			dev_err(scomp->dev, "%s pin %d format not found for %s\n",
+				(pin_type == SOF_PIN_TYPE_SINK) ? "sink" : "source",
+				i, swidget->widget->name);
+			return -EINVAL;
+		}
+	}
+
+	return 0;
+}
+
+static struct sof_ipc4_base_module_cfg_ext *
+sof_ipc4_process_add_base_cfg_extn(struct snd_sof_widget *swidget, size_t *size)
+{
+	struct sof_ipc4_base_module_cfg_ext *base_cfg_ext;
+	struct sof_ipc4_pin_format *pin_format;
+	int num_total_pins = swidget->num_sink_pins + swidget->num_source_pins;
+	int ret;
+
+	*size = struct_size(base_cfg_ext, pin_formats, num_total_pins);
+
+	base_cfg_ext = kzalloc(*size, GFP_KERNEL);
+	if (!base_cfg_ext)
+		return NULL;
+
+	base_cfg_ext->num_sink_pin_fmts = swidget->num_sink_pins;
+	base_cfg_ext->num_source_pin_fmts = swidget->num_source_pins;
+	pin_format = &base_cfg_ext->pin_formats[0];
+
+	/* copy sink pin formats */
+	ret = sof_ipc4_process_set_pin_formats(swidget, pin_format, swidget->num_sink_pins,
+					       SOF_PIN_TYPE_SINK);
+	if (ret < 0)
+		goto err;
+
+	pin_format = &base_cfg_ext->pin_formats[swidget->num_sink_pins];
+
+	/* copy source pin formats */
+	ret = sof_ipc4_process_set_pin_formats(swidget, pin_format, swidget->num_source_pins,
+					       SOF_PIN_TYPE_SOURCE);
+	if (ret < 0)
+		goto err;
+
+	return base_cfg_ext;
+err:
+	kfree(base_cfg_ext);
+	return NULL;
+}
+
 static int sof_ipc4_prepare_process_module(struct snd_sof_widget *swidget,
 					   struct snd_pcm_hw_params *fe_params,
 					   struct snd_sof_platform_stream_params *platform_params,
@@ -1668,19 +1762,9 @@ static int sof_ipc4_prepare_process_module(struct snd_sof_widget *swidget,
 
 	available_fmt->ref_audio_fmt = &available_fmt->base_config->audio_fmt;
 
-	/*
-	 * Output format is optional for process modules.
-	 * Process modules setup the output format based on audio format tokens in topology.
-	 */
-	if (process->init_payload_format == INIT_PAYLOAD_WITH_OUTPUT_FMT)
-		ret = sof_ipc4_init_audio_fmt(sdev, swidget, &process->base_config,
-					      &process->output_format, pipeline_params,
-					      available_fmt,
-					      sizeof(struct sof_ipc4_base_module_cfg));
-	else
-		ret = sof_ipc4_init_audio_fmt(sdev, swidget, &process->base_config,
-					      NULL, pipeline_params, available_fmt,
-					      sizeof(struct sof_ipc4_base_module_cfg));
+	ret = sof_ipc4_init_audio_fmt(sdev, swidget, &process->base_config,
+				      &process->output_format, pipeline_params,
+				      available_fmt, sizeof(struct sof_ipc4_base_module_cfg));
 	if (ret < 0)
 		return ret;
 
@@ -1688,16 +1772,34 @@ static int sof_ipc4_prepare_process_module(struct snd_sof_widget *swidget,
 	sof_ipc4_update_pipeline_mem_usage(sdev, swidget, &process->base_config);
 
 	/*
-	 * ipc_config_data is composed of the base_config, optional output formats followed
-	 * by the data required for module init in that order.
+	 * ipc_config_data is composed of the base_config, optional output format or optional
+	 * base config extension followed by module specific data in that order
 	 */
 	memcpy(cfg, &process->base_config, sizeof(struct sof_ipc4_base_module_cfg));
 	cfg += sizeof(struct sof_ipc4_base_module_cfg);
 
-	/* copy output format to configure data payload */
-	if (process->init_payload_format == INIT_PAYLOAD_WITH_OUTPUT_FMT) {
+	switch (process->init_payload_format) {
+	case INIT_PAYLOAD_WITH_OUTPUT_FMT:
+		/* copy output format to configure data payload */
 		memcpy(cfg, &process->output_format, sizeof(struct sof_ipc4_audio_format));
 		cfg += sizeof(struct sof_ipc4_audio_format);
+		break;
+	case INIT_PAYLOAD_WITH_BASE_CFG_EXT:
+	{
+		struct sof_ipc4_base_module_cfg_ext *base_cfg_ext;
+		size_t size;
+
+		base_cfg_ext = sof_ipc4_process_add_base_cfg_extn(swidget, &size);
+		if (!base_cfg_ext)
+			return -EINVAL;
+
+		memcpy(cfg, base_cfg_ext, size);
+		cfg += size;
+		kfree(base_cfg_ext);
+		break;
+	}
+	default:
+		break;
 	}
 
 	for (i = 0; i < widget->num_kcontrols; i++) {
