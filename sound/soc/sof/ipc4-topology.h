@@ -336,6 +336,38 @@ struct sof_ipc4_src {
 };
 
 /**
+ * struct sof_ipc4_pin_format - Module pin format
+ * @pin_index: pin index
+ * @buffer_size: buffer size
+ * @audio_fmt: audio format for the pin
+ *
+ * This structure can be used for both source or sink pins and the pin_index is relative to the
+ * pin format group (sink or source) in struct sof_ipc4_base_module_cfg_ext.
+ */
+struct sof_ipc4_pin_format {
+	u32 pin_index;
+	u32 buffer_size;
+	struct sof_ipc4_audio_format audio_fmt;
+};
+
+/**
+ * struct sof_ipc4_base_module_cfg_ext - base module config extension containing the pin format
+ * information for the module. Both @num_sink_pin_fmts and @num_source_pin_fmts cannot be 0 for a
+ * module.
+ * @num_sink_pin_fmts: number of sink pin formats in the @pin_formats array
+ * @num_source_pin_fmts: number of source pin formats in the @pin_formats array
+ * @reserved: reserved for future use
+ * @pin_formats: flexible array consisting of @num_sink_pin_fmts sink pin format items followed by
+ *		 @num_source_pin_fmts source pin format items
+ */
+struct sof_ipc4_base_module_cfg_ext {
+	u16 num_sink_pin_fmts;
+	u16 num_source_pin_fmts;
+	u8 reserved[12];
+	DECLARE_FLEX_ARRAY(struct sof_ipc4_pin_format, pin_formats);
+} __packed;
+
+/**
  * struct sof_ipc4_process - process config data
  * @base_config: IPC base config data
  * @output_format: Output audio format
