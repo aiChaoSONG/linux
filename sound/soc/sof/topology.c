@@ -1275,23 +1275,26 @@ static int sof_widget_parse_tokens(struct snd_soc_component *scomp, struct snd_s
 				ret = num_sets;
 				goto err;
 			}
-
-			if (num_sets > 1) {
-				struct snd_sof_tuple *new_tuples;
-
-				num_tuples += token_list[object_token_list[i]].count * num_sets;
-				new_tuples = krealloc(swidget->tuples,
-						      sizeof(*new_tuples) * num_tuples, GFP_KERNEL);
-				if (!new_tuples) {
-					ret = -ENOMEM;
-					goto err;
-				}
-
-				swidget->tuples = new_tuples;
-			}
+			break;
+		case SOF_PIN_FORMAT_TOKENS:
+			num_sets = swidget->num_sink_pins + swidget->num_source_pins;
 			break;
 		default:
 			break;
+		}
+
+		if (num_sets > 1) {
+			struct snd_sof_tuple *new_tuples;
+
+			num_tuples += token_list[object_token_list[i]].count * num_sets;
+			new_tuples = krealloc(swidget->tuples,
+					      sizeof(*new_tuples) * num_tuples, GFP_KERNEL);
+			if (!new_tuples) {
+				ret = -ENOMEM;
+				goto err;
+			}
+
+			swidget->tuples = new_tuples;
 		}
 
 		/* copy one set of tuples per token ID into swidget->tuples */

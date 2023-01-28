@@ -81,6 +81,28 @@ static const struct sof_topology_token ipc4_out_audio_format_tokens[] = {
 		offsetof(struct sof_ipc4_audio_format, fmt_cfg)},
 };
 
+static const struct sof_topology_token ipc4_pin_format_tokens[] = {
+	{SOF_TKN_COMP_PIN_FORMAT_RATE, SND_SOC_TPLG_TUPLE_TYPE_WORD, get_token_u32,
+		offsetof(struct sof_ipc4_pin_info, fmt.audio_fmt.sampling_frequency)},
+	{SOF_TKN_COMP_PIN_FORMAT_BIT_DEPTH, SND_SOC_TPLG_TUPLE_TYPE_WORD, get_token_u32,
+		offsetof(struct sof_ipc4_pin_info, fmt.audio_fmt.bit_depth)},
+	{SOF_TKN_COMP_PIN_FORMAT_CH_MAP, SND_SOC_TPLG_TUPLE_TYPE_WORD, get_token_u32,
+		offsetof(struct sof_ipc4_pin_info, fmt.audio_fmt.ch_map)},
+	{SOF_TKN_COMP_PIN_FORMAT_CH_CFG, SND_SOC_TPLG_TUPLE_TYPE_WORD, get_token_u32,
+		offsetof(struct sof_ipc4_pin_info, fmt.audio_fmt.ch_cfg)},
+	{SOF_TKN_COMP_PIN_FORMAT_INTERLEAVING_STYLE, SND_SOC_TPLG_TUPLE_TYPE_WORD,
+		get_token_u32, offsetof(struct sof_ipc4_pin_info,
+					fmt.audio_fmt.interleaving_style)},
+	{SOF_TKN_COMP_PIN_FORMAT_FMT_CFG, SND_SOC_TPLG_TUPLE_TYPE_WORD, get_token_u32,
+		offsetof(struct sof_ipc4_pin_info, fmt.audio_fmt.fmt_cfg)},
+	{SOF_TKN_COMP_PIN_FORMAT_BUFFER_SIZE, SND_SOC_TPLG_TUPLE_TYPE_WORD, get_token_u32,
+		offsetof(struct sof_ipc4_pin_info, fmt.buffer_size)},
+	{SOF_TKN_COMP_PIN_FORMAT_INDEX, SND_SOC_TPLG_TUPLE_TYPE_WORD, get_token_u32,
+		offsetof(struct sof_ipc4_pin_info, fmt.pin_index)},
+	{SOF_TKN_COMP_PIN_FORMAT_PIN_TYPE, SND_SOC_TPLG_TUPLE_TYPE_WORD, get_token_u32,
+		offsetof(struct sof_ipc4_pin_info, pin_type)},
+};
+
 static const struct sof_topology_token ipc4_copier_gateway_cfg_tokens[] = {
 	{SOF_TKN_CAVS_AUDIO_FORMAT_DMA_BUFFER_SIZE, SND_SOC_TPLG_TUPLE_TYPE_WORD, get_token_u32, 0},
 };
@@ -141,6 +163,8 @@ static const struct sof_token_info ipc4_token_list[SOF_TOKEN_COUNT] = {
 		ipc4_in_audio_format_tokens, ARRAY_SIZE(ipc4_in_audio_format_tokens)},
 	[SOF_OUT_AUDIO_FORMAT_TOKENS] = {"IPC4 Output Audio format tokens",
 		ipc4_out_audio_format_tokens, ARRAY_SIZE(ipc4_out_audio_format_tokens)},
+	[SOF_PIN_FORMAT_TOKENS] = {"IPC4 Pin format tokens",
+		ipc4_pin_format_tokens, ARRAY_SIZE(ipc4_pin_format_tokens)},
 	[SOF_AUDIO_FORMAT_BUFFER_SIZE_TOKENS] = {"IPC4 Audio format buffer size tokens",
 		ipc4_audio_format_buffer_size_tokens,
 		ARRAY_SIZE(ipc4_audio_format_buffer_size_tokens)},
@@ -886,6 +910,15 @@ static int sof_ipc4_widget_setup_comp_process(struct snd_sof_widget *swidget)
 				    swidget->num_tuples, sizeof(*process), 1);
 	if (ret) {
 		dev_err(scomp->dev, "parse process token failed\n");
+		goto err;
+	}
+
+	ret = sof_update_ipc_object(scomp, process->pin_info,
+				    SOF_PIN_FORMAT_TOKENS, swidget->tuples,
+				    swidget->num_tuples, sizeof(struct sof_ipc4_pin_info),
+				    swidget->num_sink_pins + swidget->num_source_pins);
+	if (ret) {
+		dev_err(scomp->dev, "parsing pin format tokens failed\n");
 		goto err;
 	}
 
@@ -2567,6 +2600,7 @@ static enum sof_tokens process_token_list[] = {
 	SOF_AUDIO_FORMAT_BUFFER_SIZE_TOKENS,
 	SOF_COMP_EXT_TOKENS,
 	SOF_PROCESS_TOKENS,
+	SOF_PIN_FORMAT_TOKENS,
 };
 
 static const struct sof_ipc_tplg_widget_ops tplg_ipc4_widget_ops[SND_SOC_DAPM_TYPE_COUNT] = {

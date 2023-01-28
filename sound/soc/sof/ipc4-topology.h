@@ -10,6 +10,7 @@
 #define __INCLUDE_SOUND_SOF_IPC4_TOPOLOGY_H__
 
 #include <sound/sof/ipc4/header.h>
+#include "sof-audio.h"
 
 #define SOF_IPC4_FW_PAGE_SIZE BIT(12)
 #define SOF_IPC4_FW_PAGE(x) ((((x) + BIT(12) - 1) & ~(BIT(12) - 1)) >> 12)
@@ -351,6 +352,16 @@ struct sof_ipc4_pin_format {
 };
 
 /**
+ * struct sof_ipc4_pin_info - Module pin info
+ * @pin_type: type of pin: source/sink
+ * @pin_format: Pin format containing the audio format for the pin
+ */
+struct sof_ipc4_pin_info {
+	u32 pin_type;
+	struct sof_ipc4_pin_format fmt;
+};
+
+/**
  * struct sof_ipc4_base_module_cfg_ext - base module config extension containing the pin format
  * information for the module. Both @num_sink_pin_fmts and @num_source_pin_fmts cannot be 0 for a
  * module.
@@ -370,6 +381,7 @@ struct sof_ipc4_base_module_cfg_ext {
 /**
  * struct sof_ipc4_process - process config data
  * @base_config: IPC base config data
+ * @pin_info: Pin information for all source/sink pins.
  * @output_format: Output audio format
  * @available_fmt: Available audio format
  * @ipc_config_data: Process module config data
@@ -378,6 +390,7 @@ struct sof_ipc4_base_module_cfg_ext {
  */
 struct sof_ipc4_process {
 	struct sof_ipc4_base_module_cfg base_config;
+	struct sof_ipc4_pin_info pin_info[2 * SOF_WIDGET_MAX_NUM_PINS];
 	struct sof_ipc4_audio_format output_format;
 	struct sof_ipc4_available_audio_format available_fmt;
 	void *ipc_config_data;
