@@ -13,8 +13,14 @@
 
 /**
  * struct sof_abi_hdr - Header for all non IPC ABI data.
- * @magic: Magic number for validation: 0x00464F53 ('S', 'O', 'F', '\0')
- * @type: Component specific type
+ * @magic: Magic number for validation
+ *	   for IPC3 data: 0x00464F53 ('S', 'O', 'F', '\0')
+ *	   for IPC4 data: 0x34464F53 ('S', 'O', 'F', '4')
+ * @ipc3: IPC3 specific parameters
+ * @ipc3.type: Component specific type (unused)
+ * @ipc4: IPC4 specific parameters
+ * @ipc4.param_id: ID of the parameter to update for the module
+ * @ipc4.reserved: Reserved for future use
  * @size: The size in bytes of the data, excluding this struct
  * @abi: SOF ABI version
  * @reserved: Reserved for future use
@@ -25,32 +31,18 @@
  */
 struct sof_abi_hdr {
 	__u32 magic;
-	__u32 type;
+	union {
+		struct {
+			__u32 type;
+		} ipc3;
+		struct {
+			__u8 param_id;
+			__u8 reserved[3];
+		} ipc4;
+	};
 	__u32 size;
 	__u32 abi;
 	__u32 reserved[4];
-	__u32 data[];
-}  __packed;
-
-/**
- * struct sof_ipc4_abi_hdr - Used by any bespoke component data structures or binary blobs.
- * @magic: The magic number for the header. The value is 'S', 'O', 'F', '4'
- * @size: The size in bytes of the data, excluding this struct
- * @abi: SOF ABI version
- * @blob_type: Type of blob: INIT_INSTANCE, CONFIG_SET or LARGE_CONFIG_SET
- *             The value is of type enum sof_ipc4_module_type
- * @param_id: ID indicating which parameter to update with the new data. The validity of
- *            the param_id with blob_type is dependent on the module implementation.
- * @reserved: Reserved for future use
- * @data: Component data - opaque to core
- */
-struct sof_ipc4_abi_hdr {
-	__u32 magic;
-	__u32 size;
-	__u32 abi;
-	__u32 blob_type;
-	__u32 param_id;
-	__u32 reserved[3];
 	__u32 data[];
 }  __packed;
 
