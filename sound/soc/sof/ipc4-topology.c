@@ -1806,10 +1806,12 @@ static int sof_ipc4_prepare_process_module(struct snd_sof_widget *swidget,
 {
 	struct snd_soc_component *scomp = swidget->scomp;
 	struct snd_sof_dev *sdev = snd_soc_component_get_drvdata(scomp);
+	struct snd_soc_dapm_widget *widget = swidget->widget;
 	struct sof_ipc4_process *process = swidget->private;
 	struct sof_ipc4_available_audio_format *available_fmt = &process->available_fmt;
+	struct sof_ipc4_fw_module *fw_module;
 	void *cfg = process->ipc_config_data;
-	int ret;
+	int ret, i;
 
 	available_fmt->ref_audio_fmt = &available_fmt->base_config->audio_fmt;
 
@@ -1851,6 +1853,29 @@ static int sof_ipc4_prepare_process_module(struct snd_sof_widget *swidget,
 	}
 	default:
 		break;
+	}
+
+	fw_module = swidget->module_info;
+
+	for (i = 0; i < widget->num_kcontrols; i++) {
+		const struct snd_kcontrol_new *kc = &widget->kcontrol_news[i];
+		struct sof_ipc4_control_data *control_data;
+		struct snd_sof_control *scontrol;
+		struct soc_bytes_ext *sbe;
+
+		/* payload uses byte kcontrol */
+		if (widget->dobj.widget.kcontrol_type[i] != SND_SOC_TPLG_TYPE_BYTES)
+			continue;
+
+		sbe = (struct soc_bytes_ext *)kc->private_value;
+		scontrol = sbe->dobj.private;
+		if (!scontrol)
+			continue;
+
+		control_data = scontrol->ipc_control_data;
+
+		control_data->msg.primary = fw_module->man4_module_entry.id;
+		control_data->msg.primary |= SOF_IPC4_MSG_TARGET(SOF_IPC4_MODULE_MSG);
 	}
 
 	/* update the pipeline params to reflect the process module's output params */
