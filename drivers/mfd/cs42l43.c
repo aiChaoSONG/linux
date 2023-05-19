@@ -524,6 +524,23 @@ static int cs42l43_mcu_stage_3_2(struct cs42l43 *cs42l43)
 	return cs42l43_soft_reset(cs42l43);
 }
 
+static int cs42l43_mcu_disable_manual(struct cs42l43 *cs42l43)
+{
+	int ret;
+
+	dev_dbg(cs42l43->dev, "Disabling MCU\n");
+
+	ret = regmap_update_bits(cs42l43->regmap, CS42L43_BLOCK_EN,
+				 CS42L43_MCU_EN_MASK, 0);
+	if (ret) {
+		dev_err(cs42l43->dev, "Failed to disable MCU: %d\n", ret);
+		return ret;
+	}
+
+	/* Soft reset to clear any register state the firmware left behind */
+	return cs42l43_soft_reset(cs42l43);
+}
+
 static int cs42l43_mcu_disable(struct cs42l43 *cs42l43)
 {
 	unsigned int val;
@@ -648,6 +665,26 @@ static int cs42l43_mcu_update_step(struct cs42l43 *cs42l43)
 	}
 
 	cs42l43->hw_lock = secure_cfg & CS42L43_LOCK_HW_STS_MASK;
+
+	/* Force skipping patching */
+	ret = regmap_read(cs42l43->regmap, CS42L43_BLOCK_EN, &mcu_rev);
+	if (ret) {
+		dev_err(cs42l43->dev,
+			"Failed to check MCU enable: %d\n", ret);
+		return ret;
+	}
+
+	if (!(mcu_rev & CS42L43_MCU_EN_MASK)) {
+		dev_warn(cs42l43->dev, "Patching was skipped, shutters non-functional\n");
+		// Disallow pinctrl reconfig of shutters
+		cs42l43->hw_lock = true;
+		boot_status = 4;
+	} else if (!cs42l43->hw_lock) {
+		return cs42l43_mcu_disable_manual(cs42l43);
+	}
+
+	patched = true;
+
 
 	if (!patched && cs42l43->hw_lock) {
 		dev_err(cs42l43->dev, "Unpatched secure device\n");
