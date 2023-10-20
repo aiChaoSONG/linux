@@ -112,6 +112,9 @@ sdw_intel_scan_controller(struct sdw_intel_acpi_info *info)
 		info->link_mask |= BIT(i);
 	}
 
+	dev_err(&adev->dev,"Force enable link0 for multilane");
+	info->link_mask = BIT(0);
+
 	return 0;
 }
 
