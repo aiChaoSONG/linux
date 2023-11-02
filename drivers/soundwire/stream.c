@@ -212,6 +212,8 @@ static int sdw_program_slave_port_params(struct sdw_bus *bus,
 		}
 	}
 
+	dev_err(&s_rt->slave->dev, "Write lane ctrl reg for port %d with value: %d\n",
+			t_params->port_num, t_params->lane_ctrl);
 	/* program DPN_LaneCtrl register */
 	if (slave_prop->lane_control_support) {
 		ret = sdw_write_no_pm(s_rt->slave, addr6, t_params->lane_ctrl);

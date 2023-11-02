@@ -182,7 +182,11 @@ static inline void sdw_fill_xport_params(struct sdw_transport_params *params,
 	params->hstart = hstart;
 	params->hstop = hstop;
 	params->blk_pkg_mode = pack_mode;
-	params->lane_ctrl = lane_ctrl;
+	/*
+	 * In SDW #0 Multilane, 3 data lanes are supported on SDW link 0,
+	 * So here we could force use lane 0, 1, 2 for data transport.
+	 */
+	params->lane_ctrl = 2;
 }
 
 /* Fill port parameter data structure */
