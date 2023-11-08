@@ -190,7 +190,7 @@ int sof_pci_probe(struct pci_dev *pci, const struct pci_device_id *pci_id)
 	struct snd_sof_pdata *sof_pdata;
 	int ret;
 
-	dev_dbg(&pci->dev, "PCI DSP detected");
+	dev_err(&pci->dev, "[Chao] PCI DSP device detected, probing..\n");
 
 	if (!desc) {
 		dev_err(dev, "error: no matching PCI descriptor\n");
@@ -202,6 +202,7 @@ int sof_pci_probe(struct pci_dev *pci, const struct pci_device_id *pci_id)
 		return -ENODEV;
 	}
 
+	dev_err(&pci->dev, "[Chao] Alloc SOF platform data\n");
 	sof_pdata = devm_kzalloc(dev, sizeof(*sof_pdata), GFP_KERNEL);
 	if (!sof_pdata)
 		return -ENOMEM;

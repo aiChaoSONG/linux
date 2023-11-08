@@ -423,7 +423,7 @@ int hda_bus_ml_init(struct hdac_bus *bus)
 
 	link_count = readl(bus->mlcap + AZX_REG_ML_MLCD) + 1;
 
-	dev_dbg(bus->dev, "HDAudio Multi-Link count: %d\n", link_count);
+	dev_err(bus->dev, "HDAudio Multi-Link count: %d\n", link_count);
 
 	for (i = 0; i < link_count; i++) {
 		ret = hda_ml_alloc_h2link(bus, i);

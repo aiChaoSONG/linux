@@ -477,7 +477,7 @@ snd_sof_pcm_platform_trigger(struct snd_sof_dev *sdev,
 /* Firmware loading */
 static inline int snd_sof_load_firmware(struct snd_sof_dev *sdev)
 {
-	dev_dbg(sdev->dev, "loading firmware\n");
+	dev_err(sdev->dev, "[Chao] Loading firmware\n");
 
 	return sof_ops(sdev)->load_firmware(sdev);
 }

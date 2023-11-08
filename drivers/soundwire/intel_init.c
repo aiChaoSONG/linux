@@ -59,6 +59,7 @@ static struct sdw_intel_link_dev *intel_link_dev_register(struct sdw_intel_res *
 	 */
 	ctx->ldev[link_id] = ldev;
 
+	dev_err(res->parent, "[Chao] assign link res for link device\n");
 	/* Add link information used in the driver probe */
 	link = &ldev->link_res;
 	link->hw_ops = res->hw_ops;
@@ -87,6 +88,7 @@ static struct sdw_intel_link_dev *intel_link_dev_register(struct sdw_intel_res *
 
 	link->hbus = res->hbus;
 
+	dev_err(res->parent, "[Chao] Init aux device for link %d\n", link_id);
 	/* now follow the two-step init/add sequence */
 	ret = auxiliary_device_init(auxdev);
 	if (ret < 0) {
@@ -96,6 +98,7 @@ static struct sdw_intel_link_dev *intel_link_dev_register(struct sdw_intel_res *
 		return ERR_PTR(ret);
 	}
 
+	dev_err(res->parent, "[Chao] Add aux device for link %d\n", link_id);
 	ret = auxiliary_device_add(&ldev->auxdev);
 	if (ret < 0) {
 		dev_err(res->parent, "failed to add link dev %s link_id %d\n",
@@ -213,6 +216,7 @@ static struct sdw_intel_ctx
 
 	INIT_LIST_HEAD(&ctx->link_list);
 
+	dev_err(&adev->dev, "[Chao] allocate and assign sdw_intel_ctx");
 	for (i = 0; i < count; i++) {
 		if (!(link_mask & BIT(i)))
 			continue;
@@ -224,6 +228,7 @@ static struct sdw_intel_ctx
 		 * with the "soundwire_intel" module prefix automatically added
 		 * by the auxiliary bus core.
 		 */
+		dev_err(&adev->dev, "[Chao] Register link device for %d\n", i);
 		ldev = intel_link_dev_register(res,
 					       ctx,
 					       acpi_fwnode_handle(adev),

@@ -644,12 +644,14 @@ int snd_intel_dsp_driver_probe(struct pci_dev *pci)
 	if (!cfg)
 		return SND_INTEL_DSP_DRIVER_ANY;
 
+	/* check how many links are present in ACPI */
 	if (cfg->flags & FLAG_SOF) {
 		if (cfg->flags & FLAG_SOF_ONLY_IF_SOUNDWIRE &&
 		    snd_intel_dsp_check_soundwire(pci) > 0) {
 			dev_info(&pci->dev, "SoundWire enabled on CannonLake+ platform, using SOF driver\n");
 			return SND_INTEL_DSP_DRIVER_SOF;
 		}
+		/* check if nhlt table from ACPI has DMIC endpoint */
 		if (cfg->flags & FLAG_SOF_ONLY_IF_DMIC &&
 		    snd_intel_dsp_check_dmic(pci)) {
 			dev_info(&pci->dev, "Digital mics found on Skylake+ platform, using SOF driver\n");

@@ -236,6 +236,8 @@ static int hda_sdw_probe(struct snd_sof_dev *sdev)
 	struct sdw_intel_res res;
 	void *sdw;
 
+	dev_err(sdev->dev, "[Chao] hda_sdw_probe()\n");
+
 	hdev = sdev->pdata->hw_pdata;
 
 	memset(&res, 0, sizeof(res));
@@ -286,6 +288,7 @@ static int hda_sdw_probe(struct snd_sof_dev *sdev)
 	res.count = hdev->info.count;
 	res.link_mask = hdev->info.link_mask;
 
+	dev_err(sdev->dev, "[Chao] Resource prepared, sdw_intel_probe()\n");
 	sdw = sdw_intel_probe(&res);
 	if (!sdw) {
 		dev_err(sdev->dev, "error: SoundWire probe failed\n");
@@ -870,6 +873,8 @@ static int hda_init(struct snd_sof_dev *sdev)
 	struct pci_dev *pci = to_pci_dev(sdev->dev);
 	int ret;
 
+	dev_err(sdev->dev, "[Chao] HDA init\n");
+
 	hbus = sof_to_hbus(sdev);
 	bus = sof_to_bus(sdev);
 
@@ -896,6 +901,7 @@ static int hda_init(struct snd_sof_dev *sdev)
 		return -ENXIO;
 	}
 
+	dev_err(sdev->dev, "[Chao] HDA bus addr: %lx, remap addr: %p\n", bus->addr, bus->remap_addr);
 	/* HDA base */
 	sdev->bar[HDA_DSP_HDA_BAR] = bus->remap_addr;
 
@@ -906,6 +912,7 @@ static int hda_init(struct snd_sof_dev *sdev)
 		goto out;
 	}
 
+	dev_err(sdev->dev, "[Chao] Get HDA controller capabilities\n");
 	/* get controller capabilities */
 	ret = hda_dsp_ctrl_get_caps(sdev);
 	if (ret < 0) {
@@ -1062,11 +1069,14 @@ static int hda_init_caps(struct snd_sof_dev *sdev)
 	u32 link_mask;
 	int ret = 0;
 
+	dev_err(bus->dev, "[Chao] Init hda capability\n");
+
 	/* check if dsp is there */
 	if (bus->ppcap)
 		dev_dbg(sdev->dev, "PP capability, will probe DSP later.\n");
 
 	/* Init HDA controller after i915 init */
+	dev_err(bus->dev, "[Chao] Reset and Init HDA controller\n");
 	ret = hda_dsp_ctrl_init_chip(sdev);
 	if (ret < 0) {
 		dev_err(bus->dev, "error: init chip failed with ret: %d\n",
@@ -1108,6 +1118,7 @@ static int hda_init_caps(struct snd_sof_dev *sdev)
 
 skip_soundwire:
 
+	dev_err(sdev->dev, "[Chao] Probe and add HDA codecs\n");
 	/* create codec instances */
 	hda_codec_probe_bus(sdev);
 
@@ -1186,6 +1197,8 @@ int hda_dsp_probe_early(struct snd_sof_dev *sdev)
 	const struct sof_intel_dsp_desc *chip;
 	int ret = 0;
 
+	dev_err(sdev->dev, "[Chao] HDA DSP probe early\n");
+
 	if (!sdev->dspless_mode_selected) {
 		/*
 		 * detect DSP by checking class/subclass/prog-id information
@@ -1216,6 +1229,7 @@ int hda_dsp_probe_early(struct snd_sof_dev *sdev)
 
 	sdev->num_cores = chip->cores_num;
 
+	dev_err(sdev->dev, "[Chao] Alloc Intel HDA device, assign to sof_pdata->hw_pdata\n");
 	hdev = devm_kzalloc(sdev->dev, sizeof(*hdev), GFP_KERNEL);
 	if (!hdev)
 		return -ENOMEM;
@@ -1233,6 +1247,7 @@ int hda_dsp_probe(struct snd_sof_dev *sdev)
 	struct sof_intel_hda_dev *hdev = sdev->pdata->hw_pdata;
 	int ret = 0;
 
+	dev_err(sdev->dev, "[Chao] Create DMIC platform device and register data for it\n");
 	hdev->dmic_dev = platform_device_register_data(sdev->dev, "dmic-codec",
 						       PLATFORM_DEVID_NONE,
 						       NULL, 0);
@@ -1265,6 +1280,7 @@ int hda_dsp_probe(struct snd_sof_dev *sdev)
 		goto hdac_bus_unmap;
 	}
 
+	dev_err(sdev->dev, "[Chao] DSP base: %p\n", sdev->bar[HDA_DSP_BAR]);
 	sdev->mmio_bar = HDA_DSP_BAR;
 	sdev->mailbox_bar = HDA_DSP_BAR;
 skip_dsp_setup:
@@ -1346,6 +1362,7 @@ skip_dsp_setup:
 
 	init_waitqueue_head(&hdev->waitq);
 
+	dev_err(sdev->dev, "[Chao] Init Intel NHLT\n");
 	hdev->nhlt = intel_nhlt_init(sdev->dev);
 
 	return 0;
@@ -1796,11 +1813,15 @@ int hda_pci_intel_probe(struct pci_dev *pci, const struct pci_device_id *pci_id)
 {
 	int ret;
 
+	dev_err(&pci->dev, "[Chao] Start HDA PCI device probe\n");
+
 	ret = snd_intel_dsp_driver_probe(pci);
 	if (ret != SND_INTEL_DSP_DRIVER_ANY && ret != SND_INTEL_DSP_DRIVER_SOF) {
 		dev_dbg(&pci->dev, "SOF PCI driver not selected, aborting probe\n");
 		return -ENODEV;
 	}
+
+	dev_err(&pci->dev, "[Chao] DSP driver selected %d:[Any-0,Legacy-1,SST-2,SOF-3,AVS-4]\n", ret);
 
 	return sof_pci_probe(pci, pci_id);
 }

@@ -156,7 +156,7 @@ static int hda_codec_probe(struct snd_sof_dev *sdev, int address)
 
 	if (resp == -1)
 		return -EIO;
-	dev_dbg(sdev->dev, "HDA codec #%d probed OK: response: %x\n",
+	dev_err(sdev->dev, "HDA codec #%d probed OK: response: %x\n",
 		address, resp);
 
 	hda_priv = devm_kzalloc(sdev->dev, sizeof(*hda_priv), GFP_KERNEL);
@@ -257,7 +257,7 @@ void hda_codec_detect_mask(struct snd_sof_dev *sdev)
 	/* detect codecs */
 	if (!bus->codec_mask) {
 		bus->codec_mask = snd_hdac_chip_readw(bus, STATESTS);
-		dev_dbg(bus->dev, "codec_mask = 0x%lx\n", bus->codec_mask);
+		dev_err(bus->dev, "codec_mask = 0x%lx\n", bus->codec_mask);
 	}
 
 	if (hda_codec_mask != -1) {
@@ -410,6 +410,8 @@ int hda_codec_i915_init(struct snd_sof_dev *sdev)
 {
 	struct hdac_bus *bus = sof_to_bus(sdev);
 	int ret;
+
+	dev_err(sdev->dev, "[Chao] hda_codec_i915_init\n");
 
 	if (IS_ENABLED(CONFIG_SND_SOC_SOF_NOCODEC_DEBUG_SUPPORT) &&
 	    sof_debug_check_flag(SOF_DBG_FORCE_NOCODEC))

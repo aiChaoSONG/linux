@@ -50,6 +50,8 @@ int sdw_slave_add(struct sdw_bus *bus,
 			     id->class_id, id->unique_id);
 	}
 
+	dev_err(bus->dev, "[Chao] Alloc and add soundwire slave: sdw:%01x:%04x:%04x:%02x:%01x\n",
+		bus->link_id, id->mfg_id, id->part_id, id->class_id, id->unique_id);
 	slave->dev.bus = &sdw_bus_type;
 	slave->dev.of_node = of_node_get(to_of_node(fwnode));
 	slave->dev.type = &sdw_slave_type;
@@ -203,6 +205,7 @@ int sdw_acpi_find_slaves(struct sdw_bus *bus)
 {
 	struct acpi_device *parent;
 
+	dev_err(bus->dev, "[Chao] Finding SDW slaves from ACPI\n");
 	parent = ACPI_COMPANION(bus->dev);
 	if (!parent) {
 		dev_err(bus->dev, "Can't find parent for acpi bind\n");

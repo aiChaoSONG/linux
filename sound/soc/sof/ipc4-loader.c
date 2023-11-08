@@ -158,6 +158,7 @@ static size_t sof_ipc4_fw_parse_basefw_ext_man(struct snd_sof_dev *sdev)
 			return ret;
 	}
 
+	dev_err(sdev->dev, "[Chao] Firmware payload offset: %lx\n", payload_offset);
 	return payload_offset;
 }
 

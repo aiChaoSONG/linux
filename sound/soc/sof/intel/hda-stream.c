@@ -823,6 +823,8 @@ int hda_dsp_stream_init(struct snd_sof_dev *sdev)
 	int i, num_playback, num_capture, num_total, ret;
 	u32 gcap;
 
+	dev_err(sdev->dev, "[Chao] Init HDA DSP stream\n");
+
 	gcap = snd_sof_dsp_read(sdev, HDA_DSP_HDA_BAR, SOF_HDA_GCAP);
 	dev_dbg(sdev->dev, "hda global caps = 0x%x\n", gcap);
 
@@ -868,6 +870,8 @@ int hda_dsp_stream_init(struct snd_sof_dev *sdev)
 		dev_err(sdev->dev, "error: RB alloc failed\n");
 		return -ENOMEM;
 	}
+
+	dev_err(sdev->dev, "[Chao] Create capture and playback streams\n");
 
 	/* create capture and playback streams */
 	for (i = 0; i < num_total; i++) {

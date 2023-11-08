@@ -260,6 +260,8 @@ static int validate_sof_ops(struct snd_sof_dev *sdev)
 {
 	int ret;
 
+	dev_err(sdev->dev, "[Chao] Init ops, and set SSP/HDA/DMIC DAI drivers\n");
+
 	/* init ops, if necessary */
 	ret = sof_ops_init(sdev);
 	if (ret < 0)
@@ -314,6 +316,7 @@ static int sof_init_environment(struct snd_sof_dev *sdev)
 	struct sof_loadable_file_profile *base_profile = &plat_data->ipc_file_profile_base;
 	int ret;
 
+	dev_err(sdev->dev, "[Chao] SOF Init env, probe dsp hardware\n");
 	/* probe the DSP hardware */
 	ret = snd_sof_probe(sdev);
 	if (ret < 0) {
@@ -322,6 +325,7 @@ static int sof_init_environment(struct snd_sof_dev *sdev)
 		return ret;
 	}
 
+	dev_err(sdev->dev, "[Chao] Check SOF Machine\n");
 	/* check machine info */
 	ret = sof_machine_check(sdev);
 	if (ret < 0) {
@@ -395,6 +399,7 @@ static int sof_probe_continue(struct snd_sof_dev *sdev)
 	struct snd_sof_pdata *plat_data = sdev->pdata;
 	int ret;
 
+	dev_err(sdev->dev, "[Chao] HDA DSP probe continue\n");
 	/* Initialize loadable file paths and check the environment validity */
 	ret = sof_init_environment(sdev);
 	if (ret)
@@ -402,6 +407,7 @@ static int sof_probe_continue(struct snd_sof_dev *sdev)
 
 	sof_set_fw_state(sdev, SOF_FW_BOOT_PREPARE);
 
+	dev_err(sdev->dev, "[Chao] Setup ASoC component driver\n");
 	/* set up platform component driver */
 	snd_sof_new_platform_drv(sdev);
 
@@ -410,6 +416,7 @@ static int sof_probe_continue(struct snd_sof_dev *sdev)
 		goto skip_dsp_init;
 	}
 
+	dev_err(sdev->dev, "[Chao] Init sof debugfs\n");
 	/* register any debug/trace capabilities */
 	ret = snd_sof_dbg_init(sdev);
 	if (ret < 0) {
@@ -423,6 +430,7 @@ static int sof_probe_continue(struct snd_sof_dev *sdev)
 		goto dbg_err;
 	}
 
+	dev_err(sdev->dev, "[Chao] Init IPC\n");
 	/* init the IPC */
 	sdev->ipc = snd_sof_ipc_init(sdev);
 	if (!sdev->ipc) {
@@ -550,6 +558,7 @@ int snd_sof_device_probe(struct device *dev, struct snd_sof_pdata *plat_data)
 	struct snd_sof_dev *sdev;
 	int ret;
 
+	dev_err(dev, "[Chao] Alloc SOF device\n");
 	sdev = devm_kzalloc(dev, sizeof(*sdev), GFP_KERNEL);
 	if (!sdev)
 		return -ENOMEM;

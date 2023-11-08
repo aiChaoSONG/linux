@@ -44,6 +44,7 @@ int snd_sof_load_firmware_raw(struct snd_sof_dev *sdev)
 			fw_filename);
 	}
 
+	dev_err(sdev->dev, "[Chao] parse extended manifest\n");
 	/* check for extended manifest */
 	ext_man_size = sdev->ipc->ops->fw_loader->parse_ext_manifest(sdev);
 	if (ext_man_size > 0) {

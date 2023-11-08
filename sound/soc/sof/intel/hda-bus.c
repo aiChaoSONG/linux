@@ -70,6 +70,8 @@ void sof_hda_bus_init(struct snd_sof_dev *sdev, struct device *dev)
 {
 	struct hdac_bus *bus = sof_to_bus(sdev);
 
+	dev_err(sdev->dev, "[Chao] SOF HDA bus init (hdev->hbus.core)\n");
+
 #if IS_ENABLED(CONFIG_SND_SOC_SOF_HDA_LINK)
 #if IS_ENABLED(CONFIG_SND_SOC_SOF_HDA_AUDIO_CODEC)
 	snd_hdac_ext_bus_init(bus, dev, &bus_core_ops, sof_hda_ext_ops);

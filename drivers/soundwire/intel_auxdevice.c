@@ -219,6 +219,7 @@ static int intel_link_probe(struct auxiliary_device *auxdev,
 	struct sdw_bus *bus;
 	int ret;
 
+	dev_err(dev, "[Chao] Probe link aux device\n");
 	sdw = devm_kzalloc(dev, sizeof(*sdw), GFP_KERNEL);
 	if (!sdw)
 		return -ENOMEM;
@@ -237,6 +238,7 @@ static int intel_link_probe(struct auxiliary_device *auxdev,
 	bus->link_id = auxdev->id;
 	bus->clk_stop_timeout = 1;
 
+	dev_err(dev, "[Chao] Probe sdw cdns\n");
 	sdw_cdns_probe(cdns);
 
 	/* Set ops */
@@ -251,6 +253,7 @@ static int intel_link_probe(struct auxiliary_device *auxdev,
 	/* avoid resuming from pm_runtime suspend if it's not required */
 	dev_pm_set_driver_flags(dev, DPM_FLAG_SMART_SUSPEND);
 
+	dev_err(dev, "[Chao] Add soundwire master\n");
 	ret = sdw_bus_master_add(bus, dev, dev->fwnode);
 	if (ret) {
 		dev_err(dev, "sdw_bus_master_add fail: %d\n", ret);
